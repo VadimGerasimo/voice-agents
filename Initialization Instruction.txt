@@ -1,0 +1,49 @@
+Build a voice agent backend with the following specifications:
+
+TECH STACK:
+- Python 3.11+
+- FastAPI framework
+- OpenAI (Whisper for STT, GPT for conversations)
+- ElevenLabs (for TTS)
+- Supabase (PostgreSQL database)
+- WebSockets for real-time streaming
+
+PROJECT REQUIREMENTS:
+Create a production-ready backend that handles:
+1. Audio file uploads and streaming
+2. Speech-to-text transcription (OpenAI Whisper)
+3. LLM-powered conversation logic with different agent personalities
+4. Text-to-speech voice generation (ElevenLabs)
+5. Real-time WebSocket connections for voice streaming
+6. Database storage for conversations, messages, and agent configs
+
+PROJECT STRUCTURE NEEDED:
+voice-agent-backend/
+├── app/
+│   ├── main.py              # FastAPI app entry point
+│   ├── config.py            # Environment variables & settings
+│   ├── models/              # Pydantic models
+│   ├── routers/             # API endpoints
+│   │   ├── audio.py
+│   │   ├── conversation.py
+│   │   └── websocket.py
+│   ├── services/            # Business logic
+│   │   ├── openai_service.py
+│   │   ├── elevenlabs_service.py
+│   │   └── supabase_service.py
+│   └── utils/               # Helper functions
+├── tests/                   # Test files
+├── .env.example             # Example environment variables
+├── requirements.txt         # Python dependencies
+├── .gitignore
+└── README.md
+
+FIRST STEPS:
+1. Set up the project structure above
+2. Create requirements.txt with all necessary packages
+3. Create .env.example with placeholder API keys
+4. Create main.py with a basic FastAPI app and health check endpoint
+5. Create config.py to load environment variables
+6. Add a README with setup instructions
+
+Create the initial project scaffold and explain what to do next.

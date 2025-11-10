@@ -1,0 +1,885 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Voice Agent WebSocket Test</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            padding: 20px;
+        }
+
+        .container {
+            background: white;
+            border-radius: 15px;
+            box-shadow: 0 10px 40px rgba(0, 0, 0, 0.2);
+            padding: 40px;
+            max-width: 600px;
+            width: 100%;
+        }
+
+        h1 {
+            color: #333;
+            margin-bottom: 10px;
+            text-align: center;
+        }
+
+        .subtitle {
+            color: #666;
+            text-align: center;
+            margin-bottom: 30px;
+            font-size: 14px;
+        }
+
+        .config-section {
+            background: #f5f5f5;
+            padding: 20px;
+            border-radius: 10px;
+            margin-bottom: 20px;
+        }
+
+        .form-group {
+            margin-bottom: 15px;
+        }
+
+        label {
+            display: block;
+            margin-bottom: 5px;
+            color: #333;
+            font-weight: 500;
+        }
+
+        select, input {
+            width: 100%;
+            padding: 10px;
+            border: 1px solid #ddd;
+            border-radius: 5px;
+            font-size: 14px;
+        }
+
+        select:focus, input:focus {
+            outline: none;
+            border-color: #667eea;
+            box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
+        }
+
+        .controls {
+            display: flex;
+            gap: 10px;
+            margin-bottom: 20px;
+        }
+
+        button {
+            flex: 1;
+            padding: 12px 20px;
+            border: none;
+            border-radius: 5px;
+            font-size: 14px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s ease;
+        }
+
+        .btn-primary {
+            background: #667eea;
+            color: white;
+        }
+
+        .btn-primary:hover:not(:disabled) {
+            background: #5568d3;
+            transform: translateY(-2px);
+            box-shadow: 0 5px 15px rgba(102, 126, 234, 0.4);
+        }
+
+        .btn-danger {
+            background: #ef4444;
+            color: white;
+        }
+
+        .btn-danger:hover:not(:disabled) {
+            background: #dc2626;
+        }
+
+        button:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+        }
+
+        .status {
+            padding: 15px;
+            border-radius: 5px;
+            margin-bottom: 20px;
+            font-weight: 500;
+        }
+
+        .status.connected {
+            background: #d1fae5;
+            color: #065f46;
+            border: 1px solid #6ee7b7;
+        }
+
+        .status.disconnected {
+            background: #fee2e2;
+            color: #7f1d1d;
+            border: 1px solid #fca5a5;
+        }
+
+        .status.connecting {
+            background: #fef3c7;
+            color: #92400e;
+            border: 1px solid #fcd34d;
+        }
+
+        .transcript-section {
+            margin-top: 30px;
+            background: #f5f5f5;
+            padding: 20px;
+            border-radius: 10px;
+        }
+
+        .transcript-title {
+            color: #333;
+            font-weight: 600;
+            margin-bottom: 15px;
+        }
+
+        #transcriptDisplay {
+            background: white;
+            padding: 15px;
+            border-radius: 5px;
+            max-height: 250px;
+            overflow-y: auto;
+            border: 1px solid #ddd;
+        }
+
+        .transcript-message {
+            margin-bottom: 12px;
+            padding-bottom: 12px;
+            border-bottom: 1px solid #eee;
+        }
+
+        .transcript-message:last-child {
+            border-bottom: none;
+        }
+
+        .transcript-user {
+            color: #667eea;
+            font-weight: 600;
+            margin-bottom: 5px;
+        }
+
+        .transcript-assistant {
+            color: #10b981;
+            font-weight: 600;
+            margin-bottom: 5px;
+        }
+
+        .transcript-text {
+            color: #333;
+            font-size: 14px;
+            line-height: 1.5;
+        }
+
+        .transcript-loading {
+            color: #999;
+            font-style: italic;
+            font-size: 13px;
+        }
+
+        .log-section {
+            margin-top: 30px;
+        }
+
+        .log-title {
+            color: #333;
+            font-weight: 600;
+            margin-bottom: 10px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .log-clear {
+            background: #e5e7eb;
+            color: #374151;
+            padding: 5px 10px;
+            border-radius: 3px;
+            font-size: 12px;
+            cursor: pointer;
+            border: none;
+            font-weight: 500;
+        }
+
+        .log-clear:hover {
+            background: #d1d5db;
+        }
+
+        #logOutput {
+            background: #1f2937;
+            color: #10b981;
+            padding: 15px;
+            border-radius: 5px;
+            font-family: 'Courier New', monospace;
+            font-size: 12px;
+            max-height: 300px;
+            overflow-y: auto;
+            border: 1px solid #374151;
+        }
+
+        .log-entry {
+            margin-bottom: 8px;
+            padding-bottom: 8px;
+            border-bottom: 1px solid #374151;
+        }
+
+        .log-entry:last-child {
+            border-bottom: none;
+        }
+
+        .log-time {
+            color: #6b7280;
+            font-size: 11px;
+        }
+
+        .log-type {
+            color: #60a5fa;
+            font-weight: bold;
+        }
+
+        .log-data {
+            color: #d1d5db;
+            word-break: break-all;
+        }
+
+        .audio-controls {
+            background: #f5f5f5;
+            padding: 20px;
+            border-radius: 10px;
+            margin-bottom: 20px;
+        }
+
+        .audio-input-group {
+            margin-bottom: 15px;
+        }
+
+        #micButton {
+            width: 100%;
+            padding: 15px;
+            background: #667eea;
+            color: white;
+            border: none;
+            border-radius: 5px;
+            font-size: 16px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s ease;
+        }
+
+        #micButton:hover:not(:disabled) {
+            background: #5568d3;
+            transform: translateY(-2px);
+            box-shadow: 0 5px 15px rgba(102, 126, 234, 0.4);
+        }
+
+        #micButton.recording {
+            background: #ef4444;
+            animation: pulse 1.5s infinite;
+        }
+
+        @keyframes pulse {
+            0%, 100% {
+                box-shadow: 0 0 0 0 rgba(239, 68, 68, 0.7);
+            }
+            50% {
+                box-shadow: 0 0 0 10px rgba(239, 68, 68, 0);
+            }
+        }
+
+        .mic-status {
+            text-align: center;
+            margin-top: 10px;
+            color: #666;
+            font-size: 14px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🎤 Voice Agent WebSocket Test</h1>
+        <p class="subtitle">Real-time voice conversation with OpenAI</p>
+
+        <!-- Status -->
+        <div id="status" class="status disconnected">
+            Status: <span id="statusText">Disconnected</span>
+        </div>
+
+        <!-- Configuration -->
+        <div class="config-section">
+            <div class="form-group">
+                <label for="model">Model:</label>
+                <select id="model">
+                    <option value="gpt-4o-realtime-mini" selected>gpt-4o-realtime-mini</option>
+                    <option value="gpt-4o-realtime">gpt-4o-realtime</option>
+                </select>
+            </div>
+            <div class="form-group">
+                <label for="voice">Voice:</label>
+                <select id="voice">
+                    <option value="alloy" selected>Alloy</option>
+                    <option value="echo">Echo</option>
+                    <option value="shimmer">Shimmer</option>
+                    <option value="fable">Fable</option>
+                    <option value="onyx">Onyx</option>
+                    <option value="nova">Nova</option>
+                    <option value="sage">Sage</option>
+                </select>
+            </div>
+        </div>
+
+        <!-- Controls -->
+        <div class="controls">
+            <button id="connectBtn" class="btn-primary" onclick="connectWebSocket()">Connect</button>
+            <button id="disconnectBtn" class="btn-danger" onclick="disconnectWebSocket()" disabled>Disconnect</button>
+        </div>
+
+        <!-- Audio Controls -->
+        <div class="audio-controls" id="audioControls" style="display: none;">
+            <div class="audio-input-group">
+                <button id="micButton" onclick="toggleMicrophone()">
+                    🎙️ Start Recording
+                </button>
+                <div class="mic-status" id="micStatus"></div>
+            </div>
+        </div>
+
+        <!-- Test Sound Section -->
+        <div class="audio-controls">
+            <div class="audio-input-group">
+                <button id="testSoundBtn" class="btn-primary" onclick="playTestSound()" style="width: 100%; padding: 12px 20px;">
+                    🔊 Test Sound
+                </button>
+                <div class="mic-status" id="testSoundStatus"></div>
+            </div>
+        </div>
+
+        <!-- Transcript Section -->
+        <div class="transcript-section" id="transcriptSection" style="display: none;">
+            <div class="transcript-title">💬 Conversation Transcript</div>
+            <div id="transcriptDisplay"></div>
+        </div>
+
+        <!-- Log Section -->
+        <div class="log-section">
+            <div class="log-title">
+                Message Log
+                <button class="log-clear" onclick="clearLog()">Clear</button>
+            </div>
+            <div id="logOutput"></div>
+        </div>
+    </div>
+
+    <script>
+        // Global variables
+        let ws = null;
+        let mediaRecorder = null;
+        let audioContext = null;
+        let isRecording = false;
+        let currentUserTranscript = '';
+        let currentAssistantTranscript = '';
+        let audioBuffer = [];
+        let audioSource = null;
+        let mediaStream = null;
+        let recordedChunks = [];
+        let audioProcessor = null;
+
+        // DOM elements
+        let statusEl, statusTextEl, connectBtn, disconnectBtn, modelSelect, voiceSelect;
+        let logOutput, micButton, micStatus, audioControls, transcriptSection, transcriptDisplay;
+        let testSoundBtn, testSoundStatus;
+
+        // Initialize DOM elements when page loads
+        document.addEventListener('DOMContentLoaded', function() {
+            statusEl = document.getElementById('status');
+            statusTextEl = document.getElementById('statusText');
+            connectBtn = document.getElementById('connectBtn');
+            disconnectBtn = document.getElementById('disconnectBtn');
+            modelSelect = document.getElementById('model');
+            voiceSelect = document.getElementById('voice');
+            logOutput = document.getElementById('logOutput');
+            micButton = document.getElementById('micButton');
+            micStatus = document.getElementById('micStatus');
+            audioControls = document.getElementById('audioControls');
+            transcriptSection = document.getElementById('transcriptSection');
+            transcriptDisplay = document.getElementById('transcriptDisplay');
+            testSoundBtn = document.getElementById('testSoundBtn');
+            testSoundStatus = document.getElementById('testSoundStatus');
+
+            log('INFO', 'Page loaded. Click "Connect" to start.');
+        });
+
+        function updateStatus(status, text) {
+            statusEl.className = `status ${status}`;
+            statusTextEl.textContent = text;
+        }
+
+        function log(type, message) {
+            const timestamp = new Date().toLocaleTimeString();
+            const entry = document.createElement('div');
+            entry.className = 'log-entry';
+            entry.innerHTML = `
+                <span class="log-time">${timestamp}</span>
+                <span class="log-type">[${type}]</span>
+                <span class="log-data">${message}</span>
+            `;
+            logOutput.appendChild(entry);
+            logOutput.scrollTop = logOutput.scrollHeight;
+        }
+
+        function clearLog() {
+            logOutput.innerHTML = '';
+        }
+
+        function addTranscriptMessage(role, text, isFinal = true) {
+            const messageEl = document.createElement('div');
+            messageEl.className = 'transcript-message';
+
+            const roleEl = document.createElement('div');
+            roleEl.className = role === 'user' ? 'transcript-user' : 'transcript-assistant';
+            roleEl.textContent = role === 'user' ? '👤 You' : '🤖 Assistant';
+
+            const textEl = document.createElement('div');
+            textEl.className = 'transcript-text';
+            textEl.textContent = text;
+
+            messageEl.appendChild(roleEl);
+            messageEl.appendChild(textEl);
+
+            transcriptDisplay.appendChild(messageEl);
+            transcriptDisplay.scrollTop = transcriptDisplay.scrollHeight;
+        }
+
+        function updateLastTranscript(role, text) {
+            // Find and update the last message of the given role
+            const messages = transcriptDisplay.querySelectorAll('.transcript-message');
+            if (messages.length > 0) {
+                const lastMessage = messages[messages.length - 1];
+                const textEl = lastMessage.querySelector('.transcript-text');
+                if (textEl && lastMessage.querySelector('.transcript-' + (role === 'user' ? 'user' : 'assistant'))) {
+                    textEl.textContent = text;
+                    transcriptDisplay.scrollTop = transcriptDisplay.scrollHeight;
+                    return;
+                }
+            }
+            // If no existing message found, create a new one
+            addTranscriptMessage(role, text, false);
+        }
+
+        function clearTranscript() {
+            transcriptDisplay.innerHTML = '';
+            currentUserTranscript = '';
+            currentAssistantTranscript = '';
+        }
+
+        function connectWebSocket() {
+            const model = modelSelect.value;
+            const voice = voiceSelect.value;
+            const wsUrl = `ws://localhost:8000/api/ws/voice`;
+
+            log('INFO', `Connecting to: ${wsUrl}`);
+            updateStatus('connecting', 'Connecting...');
+
+            ws = new WebSocket(wsUrl);
+
+            ws.onopen = () => {
+                log('SUCCESS', 'WebSocket connected!');
+                updateStatus('connected', 'Connected');
+                connectBtn.disabled = true;
+                disconnectBtn.disabled = false;
+                modelSelect.disabled = true;
+                voiceSelect.disabled = true;
+                audioControls.style.display = 'block';
+                transcriptSection.style.display = 'block';
+                clearTranscript();
+
+                // Backend automatically sends session.update, so we don't need to send it here
+                log('INFO', 'Backend is configuring session automatically...');
+                log('INFO', 'Ready to record. Click "Start Recording" to begin.');
+            };
+
+            ws.onmessage = (event) => {
+                try {
+                    const message = JSON.parse(event.data);
+
+                    // Only log to debug log if it's not a streaming message
+                    if (!['response.audio_delta', 'response.text_delta', 'input_audio_buffer.speech_started', 'input_audio_buffer.speech_stopped'].includes(message.type)) {
+                        log('RECEIVE', JSON.stringify(message, null, 2));
+                    }
+
+                    // Handle different message types
+                    if (message.type === 'session.updated') {
+                        log('SUCCESS', `Session updated`);
+                    } else if (message.type === 'input_transcription.started') {
+                        log('INFO', 'User speech detected, transcribing...');
+                        currentUserTranscript = '';
+                    } else if (message.type === 'input_transcription.delta') {
+                        // Update user transcript in real-time
+                        currentUserTranscript += message.delta;
+                        updateLastTranscript('user', currentUserTranscript);
+                    } else if (message.type === 'input_transcription.completed') {
+                        // User transcript finished (input from user's microphone)
+                        if (message.transcript) {
+                            currentUserTranscript = message.transcript;
+                            addTranscriptMessage('user', currentUserTranscript);
+                            log('TRANSCRIPT', `User: ${message.transcript}`);
+                        }
+                    } else if (message.type === 'response.audio_transcript.delta') {
+                        // Assistant response text being streamed
+                        if (!currentAssistantTranscript) {
+                            addTranscriptMessage('assistant', '');
+                        }
+                        currentAssistantTranscript += message.delta;
+                        updateLastTranscript('assistant', currentAssistantTranscript);
+                    } else if (message.type === 'response.audio_transcript.done') {
+                        // Assistant response text complete
+                        if (message.transcript) {
+                            currentAssistantTranscript = message.transcript;
+                            updateLastTranscript('assistant', currentAssistantTranscript);
+                            log('TRANSCRIPT', `Assistant: ${message.transcript}`);
+                        }
+                    } else if (message.type === 'response.text_delta') {
+                        // Update assistant response in real-time (text-only response)
+                        if (!currentAssistantTranscript) {
+                            addTranscriptMessage('assistant', '');
+                        }
+                        currentAssistantTranscript += message.delta;
+                        updateLastTranscript('assistant', currentAssistantTranscript);
+                    } else if (message.type === 'response.text_done') {
+                        log('TRANSCRIPT', `Assistant: ${currentAssistantTranscript}`);
+                    } else if (message.type === 'response.audio_delta') {
+                        // Decode base64 audio and add to buffer
+                        if (message.delta) {
+                            try {
+                                // Properly decode base64 to binary
+                                const binaryString = atob(message.delta);
+                                const bytes = new Uint8Array(binaryString.length);
+                                for (let i = 0; i < binaryString.length; i++) {
+                                    bytes[i] = binaryString.charCodeAt(i);
+                                }
+                                audioBuffer.push(bytes);
+
+                                // Log progress (only every 5 chunks to avoid spam)
+                                if (audioBuffer.length % 5 === 0) {
+                                    log('AUDIO', `Received ${audioBuffer.length} audio chunks (${bytes.length} bytes each)`);
+                                }
+                            } catch (e) {
+                                log('ERROR', `Failed to decode audio delta: ${e.message}`);
+                            }
+                        } else {
+                            log('WARNING', 'Received response.audio_delta with no delta field');
+                        }
+                    } else if (message.type === 'response.output_item.done') {
+                        // Full response item complete - extract transcript if available
+                        const item = message.item;
+                        if (item && item.content && item.content.length > 0) {
+                            const transcript = item.content[0].transcript;
+                            if (transcript && !currentAssistantTranscript) {
+                                currentAssistantTranscript = transcript;
+                                addTranscriptMessage('assistant', transcript);
+                                log('TRANSCRIPT', `Assistant: ${transcript}`);
+                            }
+                        }
+                    } else if (message.type === 'response.done') {
+                        log('SUCCESS', 'Response complete');
+                        // Play accumulated audio
+                        if (audioBuffer.length > 0) {
+                            playAudio();
+                        }
+                        // Ready for next input
+                        log('INFO', 'Ready for next input. Keep recording or click Stop to restart.');
+                    } else if (message.type === 'error') {
+                        log('ERROR', `OpenAI Error: ${JSON.stringify(message.error)}`);
+                    }
+                } catch (e) {
+                    log('ERROR', `Failed to parse message: ${e.message}`);
+                }
+            };
+
+            ws.onerror = (error) => {
+                log('ERROR', `WebSocket error: ${error}`);
+                updateStatus('disconnected', 'Error');
+            };
+
+            ws.onclose = () => {
+                log('INFO', 'WebSocket disconnected');
+                updateStatus('disconnected', 'Disconnected');
+                connectBtn.disabled = false;
+                disconnectBtn.disabled = true;
+                modelSelect.disabled = false;
+                voiceSelect.disabled = false;
+                audioControls.style.display = 'none';
+                transcriptSection.style.display = 'none';
+                if (isRecording) {
+                    stopRecording();
+                }
+            };
+        }
+
+        function disconnectWebSocket() {
+            if (ws) {
+                log('INFO', 'Closing WebSocket connection');
+                ws.close();
+            }
+        }
+
+        function playAudio() {
+            try {
+                // Combine all audio chunks into a single buffer
+                const totalLength = audioBuffer.reduce((acc, arr) => acc + arr.length, 0);
+
+                if (totalLength === 0) {
+                    log('WARNING', 'No audio data to play');
+                    return;
+                }
+
+                const combinedBuffer = new Uint8Array(totalLength);
+                let offset = 0;
+
+                for (let chunk of audioBuffer) {
+                    combinedBuffer.set(chunk, offset);
+                    offset += chunk.length;
+                }
+
+                // Convert bytes to PCM16 float32 samples (2 bytes per sample)
+                const pcmData = new Int16Array(combinedBuffer.buffer);
+                const audioData = new Float32Array(pcmData.length);
+
+                for (let i = 0; i < pcmData.length; i++) {
+                    audioData[i] = pcmData[i] / 32768.0; // Normalize to -1 to 1
+                }
+
+                // Create or resume audio context
+                if (!audioContext) {
+                    audioContext = new (window.AudioContext || window.webkitAudioContext)();
+                    log('INFO', 'Created new AudioContext');
+                }
+
+                // Resume audio context if suspended (required by browser autoplay policy)
+                if (audioContext.state === 'suspended') {
+                    audioContext.resume().then(() => {
+                        log('INFO', 'AudioContext resumed');
+                    });
+                }
+
+                // Create audio buffer
+                const sampleRate = 24000; // OpenAI Realtime API uses 24kHz
+                const newAudioBuffer = audioContext.createBuffer(1, audioData.length, sampleRate);
+                newAudioBuffer.getChannelData(0).set(audioData);
+
+                // Play the audio
+                const source = audioContext.createBufferSource();
+                source.buffer = newAudioBuffer;
+                source.connect(audioContext.destination);
+                source.start(0);
+
+                log('SUCCESS', `Playing audio response (${audioData.length} samples, ${(audioData.length / sampleRate).toFixed(2)}s)`);
+
+                // Clear the buffer for next response
+                audioBuffer = [];
+            } catch (error) {
+                log('ERROR', `Failed to play audio: ${error.message}`);
+            }
+        }
+
+        async function toggleMicrophone() {
+            if (!isRecording) {
+                await startRecording();
+            } else {
+                stopRecording();
+            }
+        }
+
+        async function startRecording() {
+            try {
+                log('INFO', 'Requesting microphone access...');
+                mediaStream = await navigator.mediaDevices.getUserMedia({
+                    audio: {
+                        echoCancellation: true,
+                        noiseSuppression: true,
+                        autoGainControl: false
+                    }
+                });
+
+                // Use AudioContext to convert audio to PCM16
+                audioContext = new (window.AudioContext || window.webkitAudioContext)({
+                    sampleRate: 24000 // OpenAI Realtime uses 24kHz
+                });
+
+                const source = audioContext.createMediaStreamSource(mediaStream);
+                audioProcessor = audioContext.createScriptProcessor(4096, 1, 1);
+
+                source.connect(audioProcessor);
+                audioProcessor.connect(audioContext.destination);
+
+                isRecording = true;
+                recordedChunks = [];
+                micButton.classList.add('recording');
+                micButton.textContent = '⏹️ Stop Recording';
+                micStatus.textContent = 'Recording... 🔴';
+
+                log('SUCCESS', `Microphone started (24kHz)`);
+
+                // Process audio in real-time
+                audioProcessor.onaudioprocess = (event) => {
+                    if (!isRecording) return;
+
+                    const audioData = event.inputBuffer.getChannelData(0);
+                    const int16Array = new Int16Array(audioData.length);
+
+                    // Convert float32 to int16
+                    for (let i = 0; i < audioData.length; i++) {
+                        int16Array[i] = Math.max(-1, Math.min(1, audioData[i])) * 0x7FFF;
+                    }
+
+                    recordedChunks.push(int16Array);
+
+                    // Send audio chunks to server
+                    const audioBase64 = btoa(String.fromCharCode.apply(null, new Uint8Array(int16Array.buffer)));
+
+                    if (ws && ws.readyState === WebSocket.OPEN && audioBase64.length > 0) {
+                        const message = {
+                            type: 'input_audio_buffer.append',
+                            audio: audioBase64
+                        };
+                        try {
+                            ws.send(JSON.stringify(message));
+                            // Log every chunk to track what's being sent
+                            if (recordedChunks.length % 5 === 0) {
+                                log('AUDIO', `Sent ${recordedChunks.length} audio chunks (${audioBase64.length} bytes each)...`);
+                            }
+                        } catch (e) {
+                            log('ERROR', `Failed to send audio chunk: ${e.message}`);
+                        }
+                    } else {
+                        if (!ws || ws.readyState !== WebSocket.OPEN) {
+                            log('ERROR', 'WebSocket not open, cannot send audio');
+                        }
+                    }
+                };
+
+                // Stop recording after 30 seconds
+                setTimeout(() => {
+                    if (isRecording) {
+                        log('INFO', 'Recording time limit reached, stopping...');
+                        stopRecording();
+                    }
+                }, 30000);
+
+            } catch (error) {
+                log('ERROR', `Microphone error: ${error.message}`);
+                alert('Microphone access denied. Please allow microphone access in your browser.');
+            }
+        }
+
+        function stopRecording() {
+            isRecording = false;
+
+            // Stop audio processor
+            if (audioProcessor) {
+                audioProcessor.disconnect();
+                audioProcessor = null;
+            }
+
+            // Stop media stream
+            if (mediaStream) {
+                mediaStream.getTracks().forEach(track => track.stop());
+                mediaStream = null;
+            }
+
+            // Close audio context
+            if (audioContext) {
+                audioContext.close();
+                audioContext = null;
+            }
+
+            micButton.classList.remove('recording');
+            micButton.textContent = '🎙️ Start Recording';
+            micStatus.textContent = '';
+
+            log('INFO', `Microphone stopped (${recordedChunks.length} chunks recorded)`);
+
+            // Send commit and request response
+            if (ws && ws.readyState === WebSocket.OPEN) {
+                // Step 1: Commit the audio buffer
+                ws.send(JSON.stringify({
+                    type: 'end_session'
+                }));
+                log('INFO', 'Audio buffer committed and response requested');
+            }
+        }
+
+        function playTestSound() {
+            try {
+                // Create or use existing audio context
+                if (!audioContext) {
+                    audioContext = new (window.AudioContext || window.webkitAudioContext)();
+                }
+
+                // Resume audio context if suspended
+                if (audioContext.state === 'suspended') {
+                    audioContext.resume().then(() => {
+                        log('INFO', 'AudioContext resumed for test sound');
+                    });
+                }
+
+                // Generate a simple test tone using oscillator
+                const oscTypes = ['sine', 'square', 'sawtooth', 'triangle'];
+                const randomOscType = oscTypes[Math.floor(Math.random() * oscTypes.length)];
+                const randomFrequency = 200 + Math.random() * 800; // Random frequency between 200-1000 Hz
+                const duration = 2; // 2 seconds
+
+                const oscillator = audioContext.createOscillator();
+                const gainNode = audioContext.createGain();
+
+                oscillator.type = randomOscType;
+                oscillator.frequency.value = randomFrequency;
+
+                // Create fade in and fade out envelope
+                const now = audioContext.currentTime;
+                gainNode.gain.setValueAtTime(0, now);
+                gainNode.gain.linearRampToValueAtTime(0.3, now + 0.2); // Fade in
+                gainNode.gain.linearRampToValueAtTime(0, now + duration); // Fade out
+
+                oscillator.connect(gainNode);
+                gainNode.connect(audioContext.destination);
+
+                oscillator.start(now);
+                oscillator.stop(now + duration);
+
+                testSoundStatus.textContent = `Playing test sound: ${randomOscType} wave at ${randomFrequency.toFixed(0)}Hz 🔊`;
+                log('SUCCESS', `Test sound playing: ${randomOscType} wave at ${randomFrequency.toFixed(0)}Hz for ${duration}s`);
+
+                // Clear status after sound finishes
+                setTimeout(() => {
+                    testSoundStatus.textContent = '';
+                }, duration * 1000);
+
+            } catch (error) {
+                log('ERROR', `Failed to play test sound: ${error.message}`);
+                testSoundStatus.textContent = '❌ Error playing sound';
+            }
+        }
+    </script>
+</body>
+</html>
