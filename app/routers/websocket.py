@@ -6,7 +6,6 @@ from fastapi import APIRouter, WebSocket, WebSocketDisconnect, Query
 import websockets
 
 from app.config import settings
-from app.services.realtime_service import realtime_service
 
 logger = logging.getLogger(__name__)
 
@@ -22,7 +21,9 @@ OPENAI_REALTIME_WS_URL = "wss://api.openai.com/v1/realtime?model=gpt-4o-realtime
 @router.websocket("/voice")
 async def websocket_voice_endpoint(
     websocket: WebSocket,
-    device_id: int = Query(None),  # Optional device_id query parameter
+    device_id: int = Query(None),
+    voice: str = Query("alloy"),
+    instructions: str = Query("You are a helpful English-speaking assistant. Answer questions concisely and naturally. Speak in a conversational tone."),
 ):
     """
     WebSocket endpoint for real-time voice conversation with OpenAI.
@@ -31,12 +32,17 @@ async def websocket_voice_endpoint(
 
     Usage:
         ws://localhost:8000/api/ws/voice
-        ws://localhost:8000/api/ws/voice?device_id=4  # Use specific device
+        ws://localhost:8000/api/ws/voice?device_id=5&voice=echo&instructions=Be+a+pirate
 
     Query Parameters:
         device_id: Optional audio device ID to use for playback (default: system default)
+        voice: OpenAI voice to use for responses
+               Valid voices: alloy, ash, ballad, coral, echo, sage, shimmer, verse, marin, cedar
+        instructions: System instructions for the AI assistant
 
-    The model and voice settings should be sent in the first message as session configuration.
+    Example:
+        voice=coral&instructions=You%20are%20a%20helpful%20assistant
+        device_id=5&voice=shimmer&instructions=Be%20a%20pirate
     """
     await websocket.accept()
 
@@ -55,12 +61,12 @@ async def websocket_voice_endpoint(
         ) as openai_ws:
             logger.info("Connected to OpenAI Realtime API")
 
-            # Send default session configuration to OpenAI
+            # Send dynamic session configuration to OpenAI
             session_config = {
                 "type": "session.update",
                 "session": {
-                    "instructions": "You are a prirat speak like a pirat and answer like a pirat",
-                    "voice": "alloy",
+                    "instructions": instructions,
+                    "voice": voice,
                     "modalities": ["audio", "text"],
                     "input_audio_format": "pcm16",
                     "output_audio_format": "pcm16",
@@ -68,7 +74,7 @@ async def websocket_voice_endpoint(
                 }
             }
             await openai_ws.send(json.dumps(session_config))
-            logger.info("Session configuration sent to OpenAI")
+            logger.info(f"Session configuration sent to OpenAI - voice: {voice}, instructions: {instructions[:50]}...")
 
             async def client_to_openai():
                 """Relay messages from client to OpenAI."""

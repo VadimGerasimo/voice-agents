@@ -338,13 +338,20 @@
                 <label for="voice">Voice:</label>
                 <select id="voice">
                     <option value="alloy" selected>Alloy</option>
+                    <option value="ash">Ash</option>
+                    <option value="ballad">Ballad</option>
+                    <option value="coral">Coral</option>
                     <option value="echo">Echo</option>
-                    <option value="shimmer">Shimmer</option>
-                    <option value="fable">Fable</option>
-                    <option value="onyx">Onyx</option>
-                    <option value="nova">Nova</option>
                     <option value="sage">Sage</option>
+                    <option value="shimmer">Shimmer</option>
+                    <option value="verse">Verse</option>
+                    <option value="marin">Marin</option>
+                    <option value="cedar">Cedar</option>
                 </select>
+            </div>
+            <div class="form-group">
+                <label for="instructions">System Instructions:</label>
+                <textarea id="instructions" style="width: 100%; padding: 10px; border: 1px solid #ddd; border-radius: 5px; font-family: monospace; font-size: 13px; resize: vertical; min-height: 80px;">You are a helpful English-speaking assistant. Answer questions concisely and naturally. Speak in a conversational tone.</textarea>
             </div>
             <div class="form-group">
                 <label for="audioDevice">Audio Output Device:</label>
@@ -432,7 +439,7 @@
         let audioProcessor = null;
 
         // DOM elements
-        let statusEl, statusTextEl, connectBtn, disconnectBtn, modelSelect, voiceSelect, audioDeviceSelect;
+        let statusEl, statusTextEl, connectBtn, disconnectBtn, modelSelect, voiceSelect, instructionsTextarea, audioDeviceSelect;
         let logOutput, micButton, micStatus, audioControls, transcriptSection, transcriptDisplay;
         let testSoundBtn, testSoundStatus;
 
@@ -444,6 +451,7 @@
             disconnectBtn = document.getElementById('disconnectBtn');
             modelSelect = document.getElementById('model');
             voiceSelect = document.getElementById('voice');
+            instructionsTextarea = document.getElementById('instructions');
             audioDeviceSelect = document.getElementById('audioDevice');
             logOutput = document.getElementById('logOutput');
             micButton = document.getElementById('micButton');
@@ -523,15 +531,25 @@
         function connectWebSocket() {
             const model = modelSelect.value;
             const voice = voiceSelect.value;
+            const instructions = instructionsTextarea.value;
             const deviceId = audioDeviceSelect.value;
 
-            // Build WebSocket URL with optional device_id parameter
+            // Build WebSocket URL with query parameters
             let wsUrl = `ws://localhost:8000/api/ws/voice`;
+            const params = new URLSearchParams();
+
             if (deviceId) {
-                wsUrl += `?device_id=${deviceId}`;
+                params.append('device_id', deviceId);
+            }
+            params.append('voice', voice);
+            params.append('instructions', instructions);
+
+            if (params.toString()) {
+                wsUrl += `?${params.toString()}`;
             }
 
             log('INFO', `Connecting to: ${wsUrl}`);
+            log('INFO', `Voice: ${voice}, Instructions: ${instructions.substring(0, 50)}...`);
             updateStatus('connecting', 'Connecting...');
 
             ws = new WebSocket(wsUrl);
