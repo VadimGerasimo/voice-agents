@@ -274,11 +274,26 @@ async def websocket_voice_endpoint(
                                     # Flush remaining audio
                                     if len(audio_buffer) > 0:
                                         logger.info(f"[AUDIO] Flushing remaining {len(audio_buffer)} audio samples")
+
                                     if stream and stream.active:
-                                        logger.info("[AUDIO] Waiting for audio playback to finish...")
-                                        sd.wait()
+                                        try:
+                                            logger.info("[AUDIO] Waiting for audio playback to finish...")
+                                            # Use a timeout to prevent blocking indefinitely
+                                            # Run sd.wait() in a thread to avoid blocking the event loop
+                                            loop = asyncio.get_event_loop()
+                                            await asyncio.wait_for(
+                                                loop.run_in_executor(None, sd.wait),
+                                                timeout=5.0  # 5 second timeout
+                                            )
+                                            logger.info("[AUDIO] Audio playback finished")
+                                        except asyncio.TimeoutError:
+                                            logger.warning("[AUDIO] Audio playback timeout - continuing anyway")
+                                        except Exception as e:
+                                            logger.error(f"[AUDIO] Error waiting for audio: {e}")
                                     else:
                                         logger.warning("[AUDIO] Stream is not active, cannot wait")
+
+                                    # Reset for next response
                                     audio_buffer = np.array([], dtype=np.int16)
                                     chunks_received = 0
                                     total_samples = 0
@@ -307,10 +322,10 @@ async def websocket_voice_endpoint(
                     logger.error(f"Error in audio playback handler: {str(e)}", exc_info=True)
 
                 finally:
-                    # Cleanup
+                    # Cleanup audio stream
                     if stream:
                         try:
-                            sd.wait()  # Wait for remaining audio to finish
+                            # Close the stream gracefully with timeout
                             stream.stop()
                             stream.close()
                             logger.info("Audio stream closed")
