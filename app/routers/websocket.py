@@ -6,6 +6,12 @@ from fastapi import APIRouter, WebSocket, WebSocketDisconnect, Query
 import websockets
 
 from app.config import settings
+from app.services.vad_service import get_vad_service, StreamingVAD
+from app.services.openai_service import openai_service
+from app.services.voice_to_voice_service import voice_to_voice_service
+import numpy as np
+import io
+import wave
 
 logger = logging.getLogger(__name__)
 
@@ -76,6 +82,22 @@ async def websocket_voice_endpoint(
             await openai_ws.send(json.dumps(session_config))
             logger.info(f"Session configuration sent to OpenAI - voice: {voice}, instructions: {instructions[:50]}...")
 
+            # Track if session was configured and check for mismatches
+            session_configured = False
+            session_update_acknowledged = False
+            warnings = []
+
+            # Check if using defaults
+            default_instructions = "You are a helpful English-speaking assistant. Answer questions concisely and naturally. Speak in a conversational tone."
+            default_voice = "alloy"
+
+            if instructions == default_instructions:
+                warnings.append("⚠️ Using DEFAULT system instructions")
+                logger.warning("System prompt is using DEFAULT value")
+            if voice == default_voice:
+                warnings.append("⚠️ Using DEFAULT voice (alloy)")
+                logger.warning("Voice is using DEFAULT value")
+
             async def client_to_openai():
                 """Relay messages from client to OpenAI."""
                 chunk_count = 0
@@ -114,6 +136,7 @@ async def websocket_voice_endpoint(
 
             async def openai_to_client_and_audio():
                 """Relay messages from OpenAI to client and queue for audio playback."""
+                nonlocal session_configured, session_update_acknowledged, warnings
                 message_count = 0
                 try:
                     async for message in openai_ws:
@@ -147,6 +170,20 @@ async def websocket_voice_endpoint(
                             # Handle different message types with correct naming (dots, not underscores)
                             if msg_type == 'response.audio.delta':
                                 logger.info(f"[AUDIO] Message #{message_count}: AUDIO DELTA RECEIVED!")
+                            elif msg_type == 'session.updated':
+                                logger.info(f"OpenAI event: {msg_type}")
+                                session_configured = True
+                                session_update_acknowledged = True
+
+                                # Send warnings to client if using defaults
+                                if warnings:
+                                    for warning_msg in warnings:
+                                        warning_notification = {
+                                            "type": "system.warning",
+                                            "message": warning_msg
+                                        }
+                                        await websocket.send_text(json.dumps(warning_notification))
+                                        logger.warning(f"Sent warning to client: {warning_msg}")
                             elif not msg_type.startswith('response.audio') and msg_type != 'input_audio_buffer.speech_started':
                                 logger.info(f"OpenAI event: {msg_type}")
 
@@ -344,6 +381,245 @@ async def websocket_voice_endpoint(
 
     finally:
         logger.info("Voice WebSocket connection closed")
+        try:
+            await websocket.close()
+        except:
+            pass
+
+
+@router.websocket("/smart-voice")
+async def websocket_smart_voice_endpoint(
+    websocket: WebSocket,
+    device_id: int = Query(None),
+    voice: str = Query("alloy"),
+    instructions: str = Query("You are a helpful English-speaking assistant. Answer questions concisely and naturally. Speak in a conversational tone."),
+):
+    """
+    Smart Voice WebSocket endpoint with Voice Activity Detection (VAD).
+
+    Provides real-time speech detection and automatic STT→LLM→TTS pipeline.
+
+    Client should send audio chunks at 16kHz sample rate as base64-encoded 16-bit PCM.
+
+    Example message:
+    {
+        "type": "audio_chunk",
+        "audio": "base64_encoded_audio"
+    }
+
+    Server sends back:
+    {
+        "type": "vad_status",
+        "is_speaking": true,
+        "speech_prob": 0.8,
+        "speech_duration_ms": 500
+    }
+
+    or
+
+    {
+        "type": "transcript",
+        "user_text": "What time is it?",
+        "assistant_text": "It is 3:00 PM."
+    }
+    """
+    await websocket.accept()
+
+    # Initialize VAD
+    logger.info("Initializing VAD service...")
+    vad_service = get_vad_service()
+    logger.info("VAD service obtained, creating StreamingVAD...")
+    streaming_vad = StreamingVAD(
+        vad_service,
+        min_speech_duration_ms=200,  # Minimum 200ms of speech before triggering
+        min_silence_duration_ms=1500,  # Wait 1.5 seconds of silence before ending speech (accounts for pauses between words)
+        speech_threshold=0.35  # Lower threshold for better speech detection
+    )
+
+    # Audio buffer for VAD processing
+    SAMPLE_RATE = 16000
+    CHUNK_SIZE = int(SAMPLE_RATE * 30 / 1000)  # 30ms chunks
+
+    try:
+        logger.info(f"Smart voice client connected - voice: {voice}, instructions: {instructions[:50]}...")
+        await websocket.send_text(json.dumps({
+            "type": "status",
+            "message": "Connected. Start speaking...",
+            "sample_rate": SAMPLE_RATE,
+            "chunk_size": CHUNK_SIZE
+        }))
+
+        chunk_count = 0
+        while True:
+            try:
+                # Receive audio chunk from client with timeout
+                try:
+                    logger.debug("Waiting for audio chunk from client...")
+                    try:
+                        message_text = await asyncio.wait_for(websocket.receive_text(), timeout=30.0)
+                        logger.debug(f"Received message: {len(message_text)} bytes")
+                    except asyncio.TimeoutError:
+                        logger.warning("No audio chunks received for 30 seconds - closing connection")
+                        break
+                except WebSocketDisconnect:
+                    logger.info("Client disconnected during receive")
+                    break
+
+                try:
+                    message = json.loads(message_text)
+                except json.JSONDecodeError as e:
+                    logger.error(f"Failed to parse message as JSON: {e}")
+                    continue
+
+                if message.get('type') == 'audio_chunk':
+                    chunk_count += 1
+                    # Decode base64 audio
+                    audio_base64 = message.get('audio', '')
+                    if not audio_base64:
+                        continue
+
+                    try:
+                        audio_bytes = base64.b64decode(audio_base64)
+                        audio_chunk = np.frombuffer(audio_bytes, dtype=np.int16)
+                        chunk_size = len(audio_chunk)
+
+                        if chunk_size != 512:
+                            logger.warning(f"[CHUNK {chunk_count}] Non-standard size: {chunk_size} samples (expected 512)")
+                        else:
+                            logger.debug(f"[CHUNK {chunk_count}] Standard size: 512 samples ✓")
+
+                        logger.info(f"[CHUNK {chunk_count}] Received {chunk_size} samples")
+
+                        # Process with VAD
+                        vad_result = streaming_vad.process_chunk(audio_chunk)
+
+                        # Log VAD results for debugging
+                        if not vad_result['speech_detected']:
+                            logger.debug(
+                                f"VAD: silence_duration={vad_result['silence_duration_ms']}ms, "
+                                f"speech_duration={vad_result['speech_duration_ms']}ms, "
+                                f"should_finalize={vad_result['should_finalize']}, "
+                                f"is_speaking={vad_result['is_speaking']}"
+                            )
+
+                        # Send VAD status back to client
+                        await websocket.send_text(json.dumps({
+                            "type": "vad_status",
+                            "is_speaking": vad_result['is_speaking'],
+                            "speech_detected": vad_result['speech_detected'],
+                            "speech_prob": round(vad_result['speech_prob'], 3),
+                            "speech_duration_ms": vad_result['speech_duration_ms'],
+                            "silence_duration_ms": vad_result['silence_duration_ms'],
+                            "should_finalize": vad_result['should_finalize'],
+                        }))
+
+                        # If speech ended, process it
+                        if vad_result['should_finalize']:
+                            logger.info(f"Speech finalization triggered by VAD (silence={vad_result['silence_duration_ms']}ms)")
+                            logger.info("Speech finalized - processing with STT→LLM→TTS")
+
+                            # Get accumulated speech buffer
+                            speech_audio = streaming_vad.get_speech_buffer()
+                            if speech_audio is not None:
+                                # Create WAV file from audio
+                                wav_buffer = io.BytesIO()
+                                with wave.open(wav_buffer, 'wb') as wav_file:
+                                    wav_file.setnchannels(1)
+                                    wav_file.setsampwidth(2)
+                                    wav_file.setframerate(SAMPLE_RATE)
+                                    wav_file.writeframes(speech_audio.tobytes())
+
+                                wav_buffer.seek(0)
+                                wav_buffer.name = "speech.wav"  # OpenAI API needs a name attribute
+
+                                # Send transcribing status
+                                await websocket.send_text(json.dumps({
+                                    "type": "status",
+                                    "message": "Transcribing..."
+                                }))
+
+                                try:
+                                    # Transcribe
+                                    transcription = openai_service.transcribe_audio(
+                                        wav_buffer,
+                                        language=None
+                                    )
+                                    user_text = transcription.get('text', '')
+                                    logger.info(f"Transcribed: {user_text}")
+
+                                    # Get LLM response
+                                    await websocket.send_text(json.dumps({
+                                        "type": "status",
+                                        "message": "Getting response..."
+                                    }))
+
+                                    llm_response = openai_service.get_chat_completion(
+                                        messages=[{"role": "user", "content": user_text}],
+                                        system_prompt=instructions,
+                                        model="gpt-4o",
+                                        temperature=0.7
+                                    )
+                                    assistant_text = llm_response.get('text', '')
+                                    logger.info(f"LLM response: {assistant_text}")
+
+                                    # Generate TTS
+                                    await websocket.send_text(json.dumps({
+                                        "type": "status",
+                                        "message": "Generating speech..."
+                                    }))
+
+                                    audio_bytes = openai_service.text_to_speech(
+                                        assistant_text,
+                                        voice=voice,
+                                        model="tts-1",
+                                        output_format="mp3"
+                                    )
+
+                                    # Send transcript and audio
+                                    audio_base64 = base64.b64encode(audio_bytes).decode('utf-8')
+                                    await websocket.send_text(json.dumps({
+                                        "type": "transcript",
+                                        "user_text": user_text,
+                                        "assistant_text": assistant_text,
+                                    }))
+
+                                    await websocket.send_text(json.dumps({
+                                        "type": "audio",
+                                        "audio": audio_base64,
+                                        "format": "mp3"
+                                    }))
+
+                                    logger.info("Response sent to client")
+
+                                except Exception as e:
+                                    logger.error(f"Error processing speech: {e}")
+                                    await websocket.send_text(json.dumps({
+                                        "type": "error",
+                                        "message": f"Error: {str(e)}"
+                                    }))
+
+                    except Exception as e:
+                        logger.error(f"Error decoding audio chunk: {e}")
+
+                else:
+                    logger.debug(f"Received non-audio message type: {message.get('type')}")
+
+            except Exception as e:
+                logger.error(f"Error in smart-voice loop: {e}")
+
+    except WebSocketDisconnect:
+        logger.info("Smart voice client disconnected")
+    except Exception as e:
+        logger.error(f"Smart voice WebSocket error: {e}")
+        try:
+            await websocket.send_text(json.dumps({
+                "type": "error",
+                "message": str(e)
+            }))
+        except:
+            pass
+    finally:
+        logger.info("Smart voice WebSocket connection closed")
         try:
             await websocket.close()
         except:

@@ -1,0 +1,2155 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Voice Agent - Realtime vs Voice-to-Voice</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            padding: 20px;
+        }
+
+        .container {
+            background: white;
+            border-radius: 15px;
+            box-shadow: 0 10px 40px rgba(0, 0, 0, 0.2);
+            padding: 40px;
+            max-width: 700px;
+            width: 100%;
+            max-height: 90vh;
+            overflow-y: auto;
+        }
+
+        h1 {
+            color: #333;
+            margin-bottom: 10px;
+            text-align: center;
+        }
+
+        .subtitle {
+            color: #666;
+            text-align: center;
+            margin-bottom: 30px;
+            font-size: 14px;
+        }
+
+        .mode-selector {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 10px;
+            margin-bottom: 30px;
+        }
+
+        .mode-btn {
+            padding: 12px 15px;
+            border: 2px solid #ddd;
+            border-radius: 5px;
+            background: white;
+            color: #333;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            font-size: 14px;
+        }
+
+        .mode-btn:hover {
+            border-color: #667eea;
+            color: #667eea;
+        }
+
+        .mode-btn.active {
+            background: #667eea;
+            color: white;
+            border-color: #667eea;
+        }
+
+        .status {
+            padding: 15px;
+            border-radius: 5px;
+            margin-bottom: 20px;
+            font-weight: 500;
+        }
+
+        .status.idle {
+            background: #e0e7ff;
+            color: #3730a3;
+            border: 1px solid #a5b4fc;
+        }
+
+        .status.processing {
+            background: #fef3c7;
+            color: #92400e;
+            border: 1px solid #fcd34d;
+            animation: pulse-yellow 1.5s infinite;
+        }
+
+        .status.success {
+            background: #d1fae5;
+            color: #065f46;
+            border: 1px solid #6ee7b7;
+        }
+
+        .status.error {
+            background: #fee2e2;
+            color: #7f1d1d;
+            border: 1px solid #fca5a5;
+        }
+
+        .status.connected {
+            background: #d1fae5;
+            color: #065f46;
+            border: 1px solid #6ee7b7;
+        }
+
+        @keyframes pulse-yellow {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.8; }
+        }
+
+        .config-section {
+            background: #f5f5f5;
+            padding: 20px;
+            border-radius: 10px;
+            margin-bottom: 20px;
+        }
+
+        .config-title {
+            font-weight: 600;
+            color: #333;
+            margin-bottom: 15px;
+            font-size: 14px;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+
+        .form-group {
+            margin-bottom: 15px;
+        }
+
+        label {
+            display: block;
+            margin-bottom: 5px;
+            color: #333;
+            font-weight: 500;
+            font-size: 13px;
+        }
+
+        select, input, textarea {
+            width: 100%;
+            padding: 10px;
+            border: 1px solid #ddd;
+            border-radius: 5px;
+            font-size: 14px;
+            font-family: inherit;
+        }
+
+        select:focus, input:focus, textarea:focus {
+            outline: none;
+            border-color: #667eea;
+            box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
+        }
+
+        textarea {
+            resize: vertical;
+            min-height: 70px;
+        }
+
+        .form-row {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 15px;
+        }
+
+        .controls {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 10px;
+            margin-bottom: 20px;
+        }
+
+        button {
+            padding: 12px 20px;
+            border: none;
+            border-radius: 5px;
+            font-size: 14px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s ease;
+        }
+
+        .btn-primary {
+            background: #667eea;
+            color: white;
+            grid-column: 1 / -1;
+        }
+
+        .btn-primary:hover:not(:disabled) {
+            background: #5568d3;
+            transform: translateY(-2px);
+            box-shadow: 0 5px 15px rgba(102, 126, 234, 0.4);
+        }
+
+        .btn-danger {
+            background: #ef4444;
+            color: white;
+        }
+
+        .btn-danger:hover:not(:disabled) {
+            background: #dc2626;
+        }
+
+        .btn-secondary {
+            background: #10b981;
+            color: white;
+        }
+
+        .btn-secondary:hover:not(:disabled) {
+            background: #059669;
+        }
+
+        button:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+        }
+
+        #micButton {
+            width: 100%;
+            padding: 15px;
+            background: #667eea;
+            color: white;
+            border: none;
+            border-radius: 5px;
+            font-size: 16px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            grid-column: 1 / -1;
+        }
+
+        #micButton:hover:not(:disabled) {
+            background: #5568d3;
+            transform: translateY(-2px);
+            box-shadow: 0 5px 15px rgba(102, 126, 234, 0.4);
+        }
+
+        #micButton.recording {
+            background: #ef4444;
+            animation: pulse 1.5s infinite;
+        }
+
+        @keyframes pulse {
+            0%, 100% {
+                box-shadow: 0 0 0 0 rgba(239, 68, 68, 0.7);
+            }
+            50% {
+                box-shadow: 0 0 0 10px rgba(239, 68, 68, 0);
+            }
+        }
+
+        .mic-status {
+            text-align: center;
+            margin-top: 10px;
+            color: #666;
+            font-size: 14px;
+        }
+
+        .tab-content {
+            display: none;
+        }
+
+        .tab-content.active {
+            display: block;
+        }
+
+        .response-section {
+            background: #f5f5f5;
+            padding: 20px;
+            border-radius: 10px;
+            margin-top: 20px;
+        }
+
+        .response-title {
+            font-weight: 600;
+            color: #333;
+            margin-bottom: 15px;
+            font-size: 14px;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+
+        .response-content {
+            background: white;
+            padding: 15px;
+            border-radius: 5px;
+            border: 1px solid #ddd;
+            margin-bottom: 15px;
+        }
+
+        .response-label {
+            font-weight: 600;
+            color: #667eea;
+            margin-bottom: 8px;
+            font-size: 12px;
+            text-transform: uppercase;
+        }
+
+        .response-text {
+            color: #333;
+            font-size: 14px;
+            line-height: 1.6;
+            word-break: break-word;
+        }
+
+        .response-metadata {
+            background: white;
+            padding: 15px;
+            border-radius: 5px;
+            border: 1px solid #ddd;
+        }
+
+        .metadata-item {
+            display: grid;
+            grid-template-columns: 150px 1fr;
+            margin-bottom: 10px;
+            gap: 15px;
+            font-size: 13px;
+        }
+
+        .metadata-item:last-child {
+            margin-bottom: 0;
+        }
+
+        .metadata-label {
+            font-weight: 600;
+            color: #667eea;
+        }
+
+        .metadata-value {
+            color: #333;
+            word-break: break-word;
+        }
+
+        .audio-player {
+            width: 100%;
+            margin-top: 10px;
+            border-radius: 5px;
+        }
+
+        .transcript-section {
+            background: #f5f5f5;
+            padding: 20px;
+            border-radius: 10px;
+            margin-top: 20px;
+        }
+
+        .transcript-title {
+            color: #333;
+            font-weight: 600;
+            margin-bottom: 15px;
+            font-size: 14px;
+            text-transform: uppercase;
+        }
+
+        #transcriptDisplay {
+            background: white;
+            padding: 15px;
+            border-radius: 5px;
+            max-height: 250px;
+            overflow-y: auto;
+            border: 1px solid #ddd;
+        }
+
+        .transcript-message {
+            margin-bottom: 12px;
+            padding-bottom: 12px;
+            border-bottom: 1px solid #eee;
+        }
+
+        .transcript-message:last-child {
+            border-bottom: none;
+        }
+
+        .transcript-user {
+            color: #667eea;
+            font-weight: 600;
+            margin-bottom: 5px;
+        }
+
+        .transcript-assistant {
+            color: #10b981;
+            font-weight: 600;
+            margin-bottom: 5px;
+        }
+
+        .transcript-text {
+            color: #333;
+            font-size: 14px;
+            line-height: 1.5;
+        }
+
+        .log-section {
+            margin-top: 20px;
+            background: #f5f5f5;
+            padding: 20px;
+            border-radius: 10px;
+        }
+
+        .log-title {
+            font-weight: 600;
+            color: #333;
+            margin-bottom: 10px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            font-size: 14px;
+            text-transform: uppercase;
+        }
+
+        .log-clear {
+            background: #e5e7eb;
+            color: #374151;
+            padding: 5px 10px;
+            border-radius: 3px;
+            font-size: 12px;
+            cursor: pointer;
+            border: none;
+            font-weight: 500;
+        }
+
+        .log-clear:hover {
+            background: #d1d5db;
+        }
+
+        #logOutput {
+            background: #1f2937;
+            color: #10b981;
+            padding: 15px;
+            border-radius: 5px;
+            font-family: 'Courier New', monospace;
+            font-size: 12px;
+            max-height: 200px;
+            overflow-y: auto;
+            border: 1px solid #374151;
+        }
+
+        .log-entry {
+            margin-bottom: 8px;
+            padding-bottom: 8px;
+            border-bottom: 1px solid #374151;
+        }
+
+        .log-entry:last-child {
+            border-bottom: none;
+            margin-bottom: 0;
+        }
+
+        .log-time {
+            color: #6b7280;
+            font-size: 11px;
+            margin-right: 8px;
+        }
+
+        .log-type {
+            color: #60a5fa;
+            font-weight: bold;
+            margin-right: 8px;
+        }
+
+        .log-entry.warning .log-type {
+            color: #f59e0b;
+        }
+
+        .log-entry.warning .log-data {
+            color: #f59e0b;
+            font-weight: 600;
+        }
+
+        .log-data {
+            color: #d1d5db;
+            word-break: break-all;
+        }
+
+        .info-box {
+            background: #e0e7ff;
+            border-left: 4px solid #667eea;
+            padding: 12px 15px;
+            border-radius: 5px;
+            font-size: 13px;
+            color: #3730a3;
+            margin-bottom: 15px;
+        }
+
+        .info-box strong {
+            display: block;
+            margin-bottom: 5px;
+        }
+
+        .devices-section {
+            background: #f5f5f5;
+            padding: 20px;
+            border-radius: 10px;
+            margin-bottom: 20px;
+            border: 1px solid #e5e7eb;
+        }
+
+        .devices-title {
+            font-weight: 600;
+            color: #333;
+            margin-bottom: 15px;
+            font-size: 12px;
+            text-transform: uppercase;
+        }
+
+        .device-row {
+            display: grid;
+            grid-template-columns: 1fr auto;
+            gap: 10px;
+            margin-bottom: 15px;
+        }
+
+        .device-row:last-child {
+            margin-bottom: 0;
+        }
+
+        .test-sound-btn {
+            padding: 10px 15px;
+            background: #10b981;
+            color: white;
+            border: none;
+            border-radius: 5px;
+            font-size: 13px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            white-space: nowrap;
+        }
+
+        .test-sound-btn:hover:not(:disabled) {
+            background: #059669;
+            transform: translateY(-2px);
+            box-shadow: 0 5px 15px rgba(16, 185, 129, 0.4);
+        }
+
+        .test-sound-btn:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+        }
+
+        .device-status {
+            font-size: 12px;
+            color: #666;
+            margin-top: 5px;
+        }
+
+        .device-status.success {
+            color: #059669;
+        }
+
+        .device-status.error {
+            color: #dc2626;
+        }
+
+        /* VAD Status Indicator */
+        .vad-indicator {
+            display: inline-block;
+            width: 12px;
+            height: 12px;
+            border-radius: 50%;
+            background: #d1d5db;
+            margin-right: 8px;
+            transition: all 0.1s ease;
+        }
+
+        .vad-indicator.listening {
+            background: #3b82f6;
+            box-shadow: 0 0 10px rgba(59, 130, 246, 0.5);
+        }
+
+        .vad-indicator.speaking {
+            background: #ef4444;
+            box-shadow: 0 0 15px rgba(239, 68, 68, 0.7);
+            animation: pulse-red 0.3s ease;
+        }
+
+        .vad-indicator.processing {
+            background: #f59e0b;
+            box-shadow: 0 0 12px rgba(245, 158, 11, 0.6);
+        }
+
+        @keyframes pulse-red {
+            0% { transform: scale(1); }
+            50% { transform: scale(1.2); }
+            100% { transform: scale(1); }
+        }
+
+        .vad-status-panel {
+            background: #f3f4f6;
+            border: 1px solid #d1d5db;
+            border-radius: 5px;
+            padding: 15px;
+            margin-bottom: 15px;
+        }
+
+        .vad-status-row {
+            display: grid;
+            grid-template-columns: 150px 1fr;
+            gap: 10px;
+            margin-bottom: 10px;
+            font-size: 13px;
+        }
+
+        .vad-status-row:last-child {
+            margin-bottom: 0;
+        }
+
+        .vad-status-label {
+            color: #6b7280;
+            font-weight: 600;
+        }
+
+        .vad-status-value {
+            color: #1f2937;
+            font-family: 'Courier New', monospace;
+        }
+
+        .vad-bar-container {
+            background: #e5e7eb;
+            height: 6px;
+            border-radius: 3px;
+            overflow: hidden;
+        }
+
+        .vad-bar {
+            background: #3b82f6;
+            height: 100%;
+            width: 0%;
+            transition: width 0.1s ease;
+        }
+
+        .transcript-container {
+            background: #f9fafb;
+            border: 1px solid #e5e7eb;
+            border-radius: 5px;
+            padding: 15px;
+            margin-top: 15px;
+            max-height: 150px;
+            overflow-y: auto;
+        }
+
+        .transcript-line {
+            margin-bottom: 10px;
+            padding-bottom: 10px;
+            border-bottom: 1px solid #e5e7eb;
+            font-size: 13px;
+            line-height: 1.5;
+        }
+
+        .transcript-line:last-child {
+            border-bottom: none;
+            margin-bottom: 0;
+            padding-bottom: 0;
+        }
+
+        .transcript-user-line {
+            color: #667eea;
+        }
+
+        .transcript-assistant-line {
+            color: #10b981;
+        }
+
+        .warning-section {
+            background: #fef3c7;
+            border-left: 4px solid #f59e0b;
+            padding: 15px;
+            border-radius: 5px;
+            margin-bottom: 20px;
+            display: none;
+        }
+
+        .warning-section.active {
+            display: block;
+        }
+
+        .warning-title {
+            font-weight: 600;
+            color: #92400e;
+            margin-bottom: 10px;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .warning-list {
+            list-style: none;
+            padding: 0;
+            margin: 0;
+        }
+
+        .warning-item {
+            color: #92400e;
+            padding: 5px 0;
+            font-size: 14px;
+        }
+
+        .warning-item:before {
+            content: "⚠️ ";
+            margin-right: 8px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🎤 Voice Agent Test</h1>
+        <p class="subtitle">Speak into microphone and test two conversation modes</p>
+
+        <!-- Status -->
+        <div id="status" class="status idle">
+            Status: <span id="statusText">Ready</span>
+        </div>
+
+        <!-- Mode Selector -->
+        <div class="mode-selector" style="grid-template-columns: 1fr 1fr 1fr;">
+            <button class="mode-btn active" onclick="selectMode('realtime')">⚡ WebSocket Realtime</button>
+            <button class="mode-btn" onclick="selectMode('pipeline')">🔄 Voice-to-Voice Pipeline</button>
+            <button class="mode-btn" onclick="selectMode('smart')">🧠 Smart Voice (VAD)</button>
+        </div>
+
+        <!-- ===== REALTIME MODE ===== -->
+        <div id="realtime-tab" class="tab-content active">
+            <div class="info-box">
+                <strong>WebSocket Realtime Mode</strong>
+                Direct connection to OpenAI Realtime API. Fastest and most responsive.
+            </div>
+
+            <!-- Warning Section -->
+            <div id="realtimeWarningSection" class="warning-section">
+                <div class="warning-title">
+                    Attention: Default Settings Applied
+                </div>
+                <ul id="realtimeWarningList" class="warning-list"></ul>
+            </div>
+
+            <!-- Audio Devices Section -->
+            <div class="devices-section">
+                <div class="devices-title">🔊 Audio Devices</div>
+                <div class="device-row">
+                    <div>
+                        <label for="realtimeAudioInput">Microphone (Input)</label>
+                        <select id="realtimeAudioInput">
+                            <option value="">System Default</option>
+                        </select>
+                        <div class="device-status" id="realtimeInputStatus"></div>
+                    </div>
+                </div>
+                <div class="device-row">
+                    <div style="flex: 1;">
+                        <label for="realtimeAudioOutput">Speaker (Output)</label>
+                        <select id="realtimeAudioOutput">
+                            <option value="">System Default</option>
+                        </select>
+                        <div class="device-status" id="realtimeOutputStatus"></div>
+                    </div>
+                    <button id="realtimeTestSoundBtn" class="test-sound-btn" onclick="playRealtimeTestSound()">🔊 Test Speaker</button>
+                </div>
+            </div>
+
+            <div class="config-section">
+                <div class="config-title">⚙️ Configuration</div>
+                <div class="form-group">
+                    <label for="realtimeVoice">Voice</label>
+                    <select id="realtimeVoice">
+                        <option value="alloy">Alloy</option>
+                        <option value="ash">Ash</option>
+                        <option value="ballad">Ballad</option>
+                        <option value="coral">Coral</option>
+                        <option value="echo">Echo</option>
+                        <option value="sage">Sage</option>
+                        <option value="shimmer">Shimmer</option>
+                        <option value="verse">Verse</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label for="realtimeInstructions">System Instructions</label>
+                    <textarea id="realtimeInstructions">You are a helpful English-speaking assistant. Answer questions concisely and naturally. Speak in a conversational tone.</textarea>
+                </div>
+            </div>
+
+            <div class="controls">
+                <button id="realtimeConnectBtn" class="btn-primary" onclick="connectRealtime()">🔌 Connect</button>
+                <button id="realtimeDisconnectBtn" class="btn-danger" onclick="disconnectRealtime()" disabled>🔌 Disconnect</button>
+            </div>
+
+            <div class="controls" id="realtimeMicControls" style="display: none;">
+                <button id="realtimeMicButton" class="btn-primary" onclick="toggleRealtimeMicrophone()">
+                    🎙️ Start Recording
+                </button>
+            </div>
+            <div class="mic-status" id="realtimeMicStatus"></div>
+
+            <!-- Transcript Section -->
+            <div class="transcript-section" id="realtimeTranscriptSection" style="display: none;">
+                <div class="transcript-title">💬 Conversation</div>
+                <div id="realtimeTranscriptDisplay"></div>
+            </div>
+        </div>
+
+        <!-- ===== PIPELINE MODE ===== -->
+        <div id="pipeline-tab" class="tab-content">
+            <div class="info-box">
+                <strong>Voice-to-Voice Pipeline Mode</strong>
+                Transcribe → LLM → TTS. More control over each step.
+            </div>
+
+            <!-- Audio Devices Section -->
+            <div class="devices-section">
+                <div class="devices-title">🔊 Audio Devices</div>
+                <div class="device-row">
+                    <div>
+                        <label for="pipelineAudioInput">Microphone (Input)</label>
+                        <select id="pipelineAudioInput">
+                            <option value="">System Default</option>
+                        </select>
+                        <div class="device-status" id="pipelineInputStatus"></div>
+                    </div>
+                </div>
+                <div class="device-row">
+                    <div style="flex: 1;">
+                        <label for="pipelineAudioOutput">Speaker (Output)</label>
+                        <select id="pipelineAudioOutput">
+                            <option value="">System Default</option>
+                        </select>
+                        <div class="device-status" id="pipelineOutputStatus"></div>
+                    </div>
+                    <button id="pipelineTestSoundBtn" class="test-sound-btn" onclick="playPipelineTestSound()">🔊 Test Speaker</button>
+                </div>
+            </div>
+
+            <!-- LLM Configuration -->
+            <div class="config-section">
+                <div class="config-title">🧠 LLM Configuration</div>
+                <div class="form-group">
+                    <label for="pipelineSystemPrompt">System Prompt (Optional)</label>
+                    <textarea id="pipelineSystemPrompt" placeholder="e.g., You are a helpful assistant..."></textarea>
+                </div>
+                <div class="form-row">
+                    <div class="form-group">
+                        <label for="pipelineLLMModel">LLM Model</label>
+                        <select id="pipelineLLMModel">
+                            <option value="gpt-4o" selected>GPT-4o (Latest)</option>
+                            <option value="gpt-4-turbo">GPT-4 Turbo</option>
+                            <option value="gpt-3.5-turbo">GPT-3.5 Turbo</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label for="pipelineTemperature">Temperature</label>
+                        <input type="number" id="pipelineTemperature" min="0" max="2" step="0.1" value="0.7">
+                    </div>
+                </div>
+                <div class="form-group">
+                    <label for="pipelineLanguage">Language (Optional)</label>
+                    <select id="pipelineLanguage">
+                        <option value="">Auto-detect</option>
+                        <option value="en">English</option>
+                        <option value="es">Spanish</option>
+                        <option value="fr">French</option>
+                        <option value="de">German</option>
+                        <option value="it">Italian</option>
+                    </select>
+                </div>
+            </div>
+
+            <!-- TTS Configuration -->
+            <div class="config-section">
+                <div class="config-title">🎵 Text-to-Speech Configuration</div>
+                <div class="form-row">
+                    <div class="form-group">
+                        <label for="pipelineVoice">Voice</label>
+                        <select id="pipelineVoice">
+                            <option value="alloy">Alloy</option>
+                            <option value="echo">Echo</option>
+                            <option value="fable">Fable</option>
+                            <option value="onyx">Onyx</option>
+                            <option value="nova" selected>Nova</option>
+                            <option value="shimmer">Shimmer</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label for="pipelineTTSModel">Model</label>
+                        <select id="pipelineTTSModel">
+                            <option value="tts-1" selected>TTS-1 (Fast)</option>
+                            <option value="tts-1-hd">TTS-1-HD (Quality)</option>
+                        </select>
+                    </div>
+                </div>
+                <div class="form-group">
+                    <label for="pipelineOutputFormat">Output Format</label>
+                    <select id="pipelineOutputFormat">
+                        <option value="mp3" selected>MP3</option>
+                        <option value="opus">Opus</option>
+                        <option value="aac">AAC</option>
+                        <option value="flac">FLAC</option>
+                    </select>
+                </div>
+            </div>
+
+            <div class="controls" id="pipelineMicControls">
+                <button id="pipelineMicButton" class="btn-primary" onclick="togglePipelineMicrophone()">
+                    🎙️ Start Recording
+                </button>
+            </div>
+            <div class="mic-status" id="pipelineMicStatus"></div>
+
+            <!-- Response Section -->
+            <div id="pipelineResponseSection" class="response-section" style="display: none;">
+                <div class="response-title">📤 Results</div>
+
+                <div class="response-content">
+                    <div class="response-label">📝 Transcribed Text</div>
+                    <div class="response-text" id="pipelineTranscribedText">-</div>
+                </div>
+
+                <div class="response-content">
+                    <div class="response-label">💬 Response Text</div>
+                    <div class="response-text" id="pipelineResponseText">-</div>
+                </div>
+
+                <div class="response-content">
+                    <div class="response-label">🎵 Audio Response</div>
+                    <audio id="pipelineAudioPlayer" class="audio-player" controls style="display: none;"></audio>
+                    <div id="pipelineAudioStatus" style="color: #666; font-size: 13px; margin-top: 8px;"></div>
+                </div>
+
+                <div class="response-metadata" id="pipelineMetadata" style="display: none;">
+                    <div class="response-label">📊 Metadata</div>
+                    <div id="pipelineMetadataContent"></div>
+                </div>
+            </div>
+        </div>
+
+        <!-- ===== SMART VOICE MODE (VAD) ===== -->
+        <div id="smart-tab" class="tab-content">
+            <div class="info-box">
+                <strong>Smart Voice Mode (VAD)</strong>
+                Continuous listening with Voice Activity Detection. Speak naturally and the system will respond automatically.
+            </div>
+
+            <!-- Audio Devices Section -->
+            <div class="devices-section">
+                <div class="devices-title">🔊 Audio Devices</div>
+                <div class="device-row">
+                    <div>
+                        <label for="smartAudioInput">Microphone (Input)</label>
+                        <select id="smartAudioInput">
+                            <option value="">System Default</option>
+                        </select>
+                        <div class="device-status" id="smartInputStatus"></div>
+                    </div>
+                </div>
+                <div class="device-row">
+                    <div style="flex: 1;">
+                        <label for="smartAudioOutput">Speaker (Output)</label>
+                        <select id="smartAudioOutput">
+                            <option value="">System Default</option>
+                        </select>
+                        <div class="device-status" id="smartOutputStatus"></div>
+                    </div>
+                    <button id="smartTestSoundBtn" class="test-sound-btn" onclick="playSmartTestSound()">🔊 Test Speaker</button>
+                </div>
+            </div>
+
+            <!-- Configuration -->
+            <div class="config-section">
+                <div class="config-title">⚙️ Configuration</div>
+                <div class="form-group">
+                    <label for="smartVoice">Voice</label>
+                    <select id="smartVoice">
+                        <option value="alloy">Alloy</option>
+                        <option value="echo">Echo</option>
+                        <option value="fable">Fable</option>
+                        <option value="onyx">Onyx</option>
+                        <option value="nova" selected>Nova</option>
+                        <option value="shimmer">Shimmer</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label for="smartInstructions">System Instructions</label>
+                    <textarea id="smartInstructions" placeholder="e.g., You are a helpful assistant...">You are a helpful English-speaking assistant. Answer questions concisely and naturally. Speak in a conversational tone.</textarea>
+                </div>
+            </div>
+
+            <!-- Control Buttons -->
+            <div class="controls">
+                <button id="smartStartBtn" class="btn-primary" onclick="startSmartVoice()">🎙️ Start Listening</button>
+                <button id="smartStopBtn" class="btn-danger" onclick="stopSmartVoice()" disabled>⏹️ Stop</button>
+            </div>
+
+            <!-- VAD Status Panel -->
+            <div id="smartVadPanel" class="vad-status-panel" style="display: none;">
+                <div style="display: flex; align-items: center; margin-bottom: 15px;">
+                    <span class="vad-indicator" id="smartVadIndicator"></span>
+                    <strong id="smartVadLabel">Listening...</strong>
+                </div>
+
+                <div class="vad-status-row">
+                    <div class="vad-status-label">Speech Detected:</div>
+                    <div class="vad-status-value" id="smartSpeechDetected">No</div>
+                </div>
+
+                <div class="vad-status-row">
+                    <div class="vad-status-label">Speech Probability:</div>
+                    <div class="vad-bar-container">
+                        <div class="vad-bar" id="smartSpeechBar"></div>
+                    </div>
+                </div>
+
+                <div class="vad-status-row">
+                    <div class="vad-status-label">Speech Duration:</div>
+                    <div class="vad-status-value" id="smartSpeechDuration">0 ms</div>
+                </div>
+
+                <div class="vad-status-row">
+                    <div class="vad-status-label">Silence Duration:</div>
+                    <div class="vad-status-value" id="smartSilenceDuration">0 ms</div>
+                </div>
+
+                <div class="vad-status-row">
+                    <div class="vad-status-label">Status:</div>
+                    <div class="vad-status-value" id="smartStatus">Listening...</div>
+                </div>
+            </div>
+
+            <!-- Transcript Display -->
+            <div id="smartTranscriptContainer" class="transcript-container" style="display: none;">
+                <div id="smartTranscriptContent"></div>
+            </div>
+
+            <!-- Response Audio -->
+            <div id="smartResponseSection" style="display: none; margin-top: 20px;">
+                <div style="font-weight: 600; margin-bottom: 10px; color: #333;">📤 Response</div>
+                <audio id="smartAudioPlayer" class="audio-player" controls></audio>
+            </div>
+        </div>
+
+        <!-- Log Section -->
+        <div class="log-section">
+            <div class="log-title">
+                📋 Log
+                <button class="log-clear" onclick="clearLog()">Clear</button>
+            </div>
+            <div id="logOutput"></div>
+        </div>
+    </div>
+
+    <script>
+        // Global state
+        let currentMode = 'realtime';
+        let isRecording = false;
+        let recordedChunks = [];
+        let mediaStream = null;
+        let audioProcessor = null;
+        let audioContext = null;
+
+        // WebSocket realtime
+        let ws = null;
+        let currentUserTranscript = '';
+        let currentAssistantTranscript = '';
+        let audioBuffer = [];
+        let realtimeWarnings = [];
+
+        // DOM elements
+        let statusEl, statusTextEl, logOutput;
+        let realtimeConnectBtn, realtimeDisconnectBtn, realtimeMicButton, realtimeMicStatus, realtimeMicControls;
+        let realtimeVoiceSelect, realtimeInstructionsTextarea, realtimeTranscriptSection, realtimeTranscriptDisplay;
+        let realtimeAudioInputSelect, realtimeAudioOutputSelect, realtimeTestSoundBtn;
+        let realtimeWarningSection, realtimeWarningList;
+        let pipelineMicButton, pipelineMicStatus, pipelineMicControls;
+        let pipelineSystemPromptEl, pipelineLLMModelEl, pipelineTemperatureEl, pipelineLanguageEl;
+        let pipelineVoiceEl, pipelineTTSModelEl, pipelineOutputFormatEl;
+        let pipelineResponseSection, pipelineTranscribedTextEl, pipelineResponseTextEl;
+        let pipelineAudioPlayer, pipelineAudioStatusEl, pipelineMetadataEl, pipelineMetadataContentEl;
+        let pipelineAudioInputSelect, pipelineAudioOutputSelect, pipelineTestSoundBtn;
+
+        // Smart Voice mode
+        let smartWs = null;
+        let smartAudioContext = null;
+        let smartMediaStream = null;
+        let smartAudioProcessor = null;
+        let smartIsListening = false;
+        let smartAudioInputSelect, smartAudioOutputSelect, smartTestSoundBtn;
+        let smartVadPanel, smartVadIndicator, smartVadLabel;
+        let smartSpeechDetected, smartSpeechBar, smartSpeechDuration, smartSilenceDuration, smartStatus;
+        let smartTranscriptContainer, smartTranscriptContent;
+        let smartResponseSection, smartAudioPlayer;
+        let smartStartBtn, smartStopBtn;
+        let smartVoiceSelect, smartInstructions;
+
+        document.addEventListener('DOMContentLoaded', function() {
+            // Status
+            statusEl = document.getElementById('status');
+            statusTextEl = document.getElementById('statusText');
+            logOutput = document.getElementById('logOutput');
+
+            // Realtime mode
+            realtimeConnectBtn = document.getElementById('realtimeConnectBtn');
+            realtimeDisconnectBtn = document.getElementById('realtimeDisconnectBtn');
+            realtimeMicButton = document.getElementById('realtimeMicButton');
+            realtimeMicStatus = document.getElementById('realtimeMicStatus');
+            realtimeMicControls = document.getElementById('realtimeMicControls');
+            realtimeVoiceSelect = document.getElementById('realtimeVoice');
+            realtimeInstructionsTextarea = document.getElementById('realtimeInstructions');
+            realtimeTranscriptSection = document.getElementById('realtimeTranscriptSection');
+            realtimeTranscriptDisplay = document.getElementById('realtimeTranscriptDisplay');
+            realtimeAudioInputSelect = document.getElementById('realtimeAudioInput');
+            realtimeAudioOutputSelect = document.getElementById('realtimeAudioOutput');
+            realtimeTestSoundBtn = document.getElementById('realtimeTestSoundBtn');
+            realtimeWarningSection = document.getElementById('realtimeWarningSection');
+            realtimeWarningList = document.getElementById('realtimeWarningList');
+
+            // Pipeline mode
+            pipelineMicButton = document.getElementById('pipelineMicButton');
+            pipelineMicStatus = document.getElementById('pipelineMicStatus');
+            pipelineMicControls = document.getElementById('pipelineMicControls');
+            pipelineSystemPromptEl = document.getElementById('pipelineSystemPrompt');
+            pipelineLLMModelEl = document.getElementById('pipelineLLMModel');
+            pipelineTemperatureEl = document.getElementById('pipelineTemperature');
+            pipelineLanguageEl = document.getElementById('pipelineLanguage');
+            pipelineVoiceEl = document.getElementById('pipelineVoice');
+            pipelineTTSModelEl = document.getElementById('pipelineTTSModel');
+            pipelineOutputFormatEl = document.getElementById('pipelineOutputFormat');
+            pipelineResponseSection = document.getElementById('pipelineResponseSection');
+            pipelineTranscribedTextEl = document.getElementById('pipelineTranscribedText');
+            pipelineResponseTextEl = document.getElementById('pipelineResponseText');
+            pipelineAudioPlayer = document.getElementById('pipelineAudioPlayer');
+            pipelineAudioStatusEl = document.getElementById('pipelineAudioStatus');
+            pipelineMetadataEl = document.getElementById('pipelineMetadata');
+            pipelineMetadataContentEl = document.getElementById('pipelineMetadataContent');
+            pipelineAudioInputSelect = document.getElementById('pipelineAudioInput');
+            pipelineAudioOutputSelect = document.getElementById('pipelineAudioOutput');
+            pipelineTestSoundBtn = document.getElementById('pipelineTestSoundBtn');
+
+            // Smart Voice mode
+            smartAudioInputSelect = document.getElementById('smartAudioInput');
+            smartAudioOutputSelect = document.getElementById('smartAudioOutput');
+            smartTestSoundBtn = document.getElementById('smartTestSoundBtn');
+            smartVadPanel = document.getElementById('smartVadPanel');
+            smartVadIndicator = document.getElementById('smartVadIndicator');
+            smartVadLabel = document.getElementById('smartVadLabel');
+            smartSpeechDetected = document.getElementById('smartSpeechDetected');
+            smartSpeechBar = document.getElementById('smartSpeechBar');
+            smartSpeechDuration = document.getElementById('smartSpeechDuration');
+            smartSilenceDuration = document.getElementById('smartSilenceDuration');
+            smartStatus = document.getElementById('smartStatus');
+            smartTranscriptContainer = document.getElementById('smartTranscriptContainer');
+            smartTranscriptContent = document.getElementById('smartTranscriptContent');
+            smartResponseSection = document.getElementById('smartResponseSection');
+            smartAudioPlayer = document.getElementById('smartAudioPlayer');
+            smartStartBtn = document.getElementById('smartStartBtn');
+            smartStopBtn = document.getElementById('smartStopBtn');
+            smartVoiceSelect = document.getElementById('smartVoice');
+            smartInstructions = document.getElementById('smartInstructions');
+
+            // Enumerate audio devices
+            enumerateAudioDevices();
+
+            log('INFO', 'Page loaded. Select a mode and configure settings.');
+        });
+
+        // Enumerate and populate audio devices
+        async function enumerateAudioDevices() {
+            try {
+                const devices = await navigator.mediaDevices.enumerateDevices();
+
+                const audioInputs = devices.filter(device => device.kind === 'audioinput');
+                const audioOutputs = devices.filter(device => device.kind === 'audiooutput');
+
+                log('INFO', `Found ${audioInputs.length} input device(s) and ${audioOutputs.length} output device(s)`);
+
+                // Populate input devices (microphones)
+                audioInputs.forEach(device => {
+                    const option = document.createElement('option');
+                    option.value = device.deviceId;
+                    option.text = device.label || `Microphone ${device.deviceId}`;
+                    realtimeAudioInputSelect.appendChild(option);
+
+                    const option2 = document.createElement('option');
+                    option2.value = device.deviceId;
+                    option2.text = device.label || `Microphone ${device.deviceId}`;
+                    pipelineAudioInputSelect.appendChild(option2);
+                });
+
+                // Populate output devices (speakers)
+                audioOutputs.forEach(device => {
+                    const option = document.createElement('option');
+                    option.value = device.deviceId;
+                    option.text = device.label || `Speaker ${device.deviceId}`;
+                    realtimeAudioOutputSelect.appendChild(option);
+
+                    const option2 = document.createElement('option');
+                    option2.value = device.deviceId;
+                    option2.text = device.label || `Speaker ${device.deviceId}`;
+                    pipelineAudioOutputSelect.appendChild(option2);
+                });
+
+                log('INFO', 'Audio devices enumerated successfully');
+            } catch (error) {
+                log('ERROR', `Failed to enumerate audio devices: ${error.message}`);
+            }
+        }
+
+        // Play test sound for realtime mode
+        function playRealtimeTestSound() {
+            playTestSound(realtimeAudioOutputSelect.value, realtimeTestSoundBtn);
+        }
+
+        // Play test sound for pipeline mode
+        function playPipelineTestSound() {
+            playTestSound(pipelineAudioOutputSelect.value, pipelineTestSoundBtn);
+        }
+
+        // Generic test sound function
+        function playTestSound(deviceId, button) {
+            try {
+                button.disabled = true;
+
+                if (!audioContext) {
+                    audioContext = new (window.AudioContext || window.webkitAudioContext)();
+                }
+
+                if (audioContext.state === 'suspended') {
+                    audioContext.resume().then(() => {
+                        log('INFO', 'AudioContext resumed for test sound');
+                    });
+                }
+
+                // Generate a simple test tone
+                const oscTypes = ['sine', 'square', 'sawtooth', 'triangle'];
+                const randomOscType = oscTypes[Math.floor(Math.random() * oscTypes.length)];
+                const randomFrequency = 200 + Math.random() * 800;
+                const duration = 2;
+
+                const oscillator = audioContext.createOscillator();
+                const gainNode = audioContext.createGain();
+
+                oscillator.type = randomOscType;
+                oscillator.frequency.value = randomFrequency;
+
+                // Fade in and fade out
+                const now = audioContext.currentTime;
+                gainNode.gain.setValueAtTime(0, now);
+                gainNode.gain.linearRampToValueAtTime(0.3, now + 0.2);
+                gainNode.gain.linearRampToValueAtTime(0, now + duration);
+
+                oscillator.connect(gainNode);
+                gainNode.connect(audioContext.destination);
+
+                oscillator.start(now);
+                oscillator.stop(now + duration);
+
+                log('SUCCESS', `Test sound: ${randomOscType} wave at ${randomFrequency.toFixed(0)}Hz for ${duration}s`);
+
+                setTimeout(() => {
+                    button.disabled = false;
+                }, duration * 1000);
+
+            } catch (error) {
+                log('ERROR', `Failed to play test sound: ${error.message}`);
+                button.disabled = false;
+            }
+        }
+
+        function selectMode(mode) {
+            // Stop any active recording or connection
+            if (isRecording) {
+                if (currentMode === 'realtime') {
+                    stopRealtimeMicrophone();
+                } else {
+                    stopPipelineMicrophone();
+                }
+            }
+            if (ws && currentMode === 'realtime') {
+                disconnectRealtime();
+            }
+
+            currentMode = mode;
+
+            // Update UI
+            document.querySelectorAll('.mode-btn').forEach(btn => {
+                btn.classList.remove('active');
+            });
+            event.target.classList.add('active');
+
+            document.querySelectorAll('.tab-content').forEach(tab => {
+                tab.classList.remove('active');
+            });
+            document.getElementById(mode + '-tab').classList.add('active');
+
+            log('INFO', `Switched to ${mode === 'realtime' ? 'WebSocket Realtime' : 'Voice-to-Voice Pipeline'} mode`);
+        }
+
+        function updateStatus(status, text) {
+            statusEl.className = `status ${status}`;
+            statusTextEl.textContent = text;
+        }
+
+        function log(type, message) {
+            const timestamp = new Date().toLocaleTimeString();
+            const entry = document.createElement('div');
+            entry.className = 'log-entry';
+            if (type === 'WARNING') {
+                entry.classList.add('warning');
+            }
+            entry.innerHTML = `
+                <span class="log-time">${timestamp}</span>
+                <span class="log-type">[${type}]</span>
+                <span class="log-data">${message}</span>
+            `;
+            logOutput.appendChild(entry);
+            logOutput.scrollTop = logOutput.scrollHeight;
+        }
+
+        function clearLog() {
+            logOutput.innerHTML = '';
+        }
+
+        // ===== REALTIME MODE FUNCTIONS =====
+
+        function connectRealtime() {
+            const voice = realtimeVoiceSelect.value;
+            const instructions = realtimeInstructionsTextarea.value;
+
+            const wsUrl = `ws://localhost:8000/api/ws/voice?voice=${voice}&instructions=${encodeURIComponent(instructions)}`;
+
+            log('INFO', `Connecting to WebSocket: ${wsUrl.split('?')[0]}`);
+            updateStatus('processing', 'Connecting...');
+
+            ws = new WebSocket(wsUrl);
+
+            ws.onopen = () => {
+                log('SUCCESS', 'WebSocket connected!');
+                updateStatus('connected', 'Connected');
+                realtimeConnectBtn.disabled = true;
+                realtimeDisconnectBtn.disabled = false;
+                realtimeVoiceSelect.disabled = true;
+                realtimeInstructionsTextarea.disabled = true;
+                realtimeMicControls.style.display = 'grid';
+                realtimeTranscriptSection.style.display = 'block';
+                realtimeTranscriptDisplay.innerHTML = '';
+                currentUserTranscript = '';
+                currentAssistantTranscript = '';
+                realtimeWarnings = [];
+                realtimeWarningSection.classList.remove('active');
+                realtimeWarningList.innerHTML = '';
+                log('INFO', 'Ready to record. Click Start Recording to begin.');
+            };
+
+            ws.onmessage = (event) => {
+                try {
+                    const message = JSON.parse(event.data);
+
+                    if (message.type === 'input_transcription.delta') {
+                        currentUserTranscript += message.delta;
+                        updateRealtimeTranscript('user', currentUserTranscript);
+                    } else if (message.type === 'input_transcription.completed') {
+                        if (message.transcript) {
+                            currentUserTranscript = message.transcript;
+                            addRealtimeTranscriptMessage('user', currentUserTranscript);
+                            log('TRANSCRIPT', `User: ${message.transcript}`);
+                        }
+                    } else if (message.type === 'response.audio_transcript.delta') {
+                        if (!currentAssistantTranscript) {
+                            addRealtimeTranscriptMessage('assistant', '');
+                        }
+                        currentAssistantTranscript += message.delta;
+                        updateRealtimeTranscript('assistant', currentAssistantTranscript);
+                    } else if (message.type === 'response.audio_transcript.done') {
+                        if (message.transcript) {
+                            currentAssistantTranscript = message.transcript;
+                            updateRealtimeTranscript('assistant', currentAssistantTranscript);
+                            log('TRANSCRIPT', `Assistant: ${message.transcript}`);
+                        }
+                    } else if (message.type === 'response.done') {
+                        log('SUCCESS', 'Response complete');
+                    } else if (message.type === 'system.warning') {
+                        log('WARNING', message.message);
+                        addRealtimeWarning(message.message);
+                    } else if (message.type === 'error') {
+                        log('ERROR', `OpenAI Error: ${JSON.stringify(message.error)}`);
+                    }
+                } catch (e) {
+                    log('ERROR', `Failed to parse message: ${e.message}`);
+                }
+            };
+
+            ws.onerror = (error) => {
+                log('ERROR', `WebSocket error: ${error}`);
+                updateStatus('error', 'Error');
+            };
+
+            ws.onclose = () => {
+                log('INFO', 'WebSocket disconnected');
+                updateStatus('idle', 'Disconnected');
+                realtimeConnectBtn.disabled = false;
+                realtimeDisconnectBtn.disabled = true;
+                realtimeVoiceSelect.disabled = false;
+                realtimeInstructionsTextarea.disabled = false;
+                realtimeMicControls.style.display = 'none';
+                realtimeWarnings = [];
+                realtimeWarningSection.classList.remove('active');
+                realtimeWarningList.innerHTML = '';
+                if (isRecording && currentMode === 'realtime') {
+                    stopRealtimeMicrophone();
+                }
+            };
+        }
+
+        function disconnectRealtime() {
+            if (ws) {
+                log('INFO', 'Closing WebSocket connection');
+                ws.close();
+            }
+        }
+
+        function addRealtimeTranscriptMessage(role, text) {
+            const messageEl = document.createElement('div');
+            messageEl.className = 'transcript-message';
+
+            const roleEl = document.createElement('div');
+            roleEl.className = role === 'user' ? 'transcript-user' : 'transcript-assistant';
+            roleEl.textContent = role === 'user' ? '👤 You' : '🤖 Assistant';
+
+            const textEl = document.createElement('div');
+            textEl.className = 'transcript-text';
+            textEl.textContent = text;
+
+            messageEl.appendChild(roleEl);
+            messageEl.appendChild(textEl);
+            realtimeTranscriptDisplay.appendChild(messageEl);
+            realtimeTranscriptDisplay.scrollTop = realtimeTranscriptDisplay.scrollHeight;
+        }
+
+        function updateRealtimeTranscript(role, text) {
+            const messages = realtimeTranscriptDisplay.querySelectorAll('.transcript-message');
+            if (messages.length > 0) {
+                const lastMessage = messages[messages.length - 1];
+                const textEl = lastMessage.querySelector('.transcript-text');
+                if (textEl && lastMessage.querySelector('.transcript-' + (role === 'user' ? 'user' : 'assistant'))) {
+                    textEl.textContent = text;
+                    realtimeTranscriptDisplay.scrollTop = realtimeTranscriptDisplay.scrollHeight;
+                    return;
+                }
+            }
+            addRealtimeTranscriptMessage(role, text);
+        }
+
+        function addRealtimeWarning(warningMessage) {
+            // Add to warnings list if not already there
+            if (!realtimeWarnings.includes(warningMessage)) {
+                realtimeWarnings.push(warningMessage);
+
+                // Create warning item
+                const warningItem = document.createElement('li');
+                warningItem.className = 'warning-item';
+                warningItem.textContent = warningMessage;
+                realtimeWarningList.appendChild(warningItem);
+
+                // Show warning section
+                realtimeWarningSection.classList.add('active');
+            }
+        }
+
+        async function toggleRealtimeMicrophone() {
+            if (!isRecording) {
+                await startRealtimeMicrophone();
+            } else {
+                stopRealtimeMicrophone();
+            }
+        }
+
+        async function startRealtimeMicrophone() {
+            try {
+                log('INFO', 'Requesting microphone access...');
+
+                const audioConstraints = {
+                    echoCancellation: true,
+                    noiseSuppression: true,
+                    autoGainControl: true  // Enable auto gain to boost quiet microphones
+                };
+
+                // Use selected input device if not system default
+                const selectedInputDevice = realtimeAudioInputSelect.value;
+                if (selectedInputDevice) {
+                    audioConstraints.deviceId = selectedInputDevice;
+                    log('INFO', `Using selected input device: ${realtimeAudioInputSelect.options[realtimeAudioInputSelect.selectedIndex].text}`);
+                }
+
+                mediaStream = await navigator.mediaDevices.getUserMedia({
+                    audio: audioConstraints
+                });
+
+                audioContext = new (window.AudioContext || window.webkitAudioContext)({
+                    sampleRate: 24000
+                });
+
+                const source = audioContext.createMediaStreamSource(mediaStream);
+                audioProcessor = audioContext.createScriptProcessor(4096, 1, 1);
+
+                source.connect(audioProcessor);
+                audioProcessor.connect(audioContext.destination);
+
+                isRecording = true;
+                recordedChunks = [];
+                realtimeMicButton.classList.add('recording');
+                realtimeMicButton.textContent = '⏹️ Stop Recording';
+                realtimeMicStatus.textContent = 'Recording... 🔴';
+
+                log('SUCCESS', 'Microphone started (24kHz)');
+
+                audioProcessor.onaudioprocess = (event) => {
+                    if (!isRecording) return;
+
+                    const audioData = event.inputBuffer.getChannelData(0);
+                    const int16Array = new Int16Array(audioData.length);
+
+                    for (let i = 0; i < audioData.length; i++) {
+                        int16Array[i] = Math.max(-1, Math.min(1, audioData[i])) * 0x7FFF;
+                    }
+
+                    recordedChunks.push(int16Array);
+
+                    const audioBase64 = btoa(String.fromCharCode.apply(null, new Uint8Array(int16Array.buffer)));
+
+                    if (ws && ws.readyState === WebSocket.OPEN && audioBase64.length > 0) {
+                        const message = {
+                            type: 'input_audio_buffer.append',
+                            audio: audioBase64
+                        };
+                        try {
+                            ws.send(JSON.stringify(message));
+                        } catch (e) {
+                            log('ERROR', `Failed to send audio chunk: ${e.message}`);
+                        }
+                    }
+                };
+            } catch (error) {
+                log('ERROR', `Microphone error: ${error.message}`);
+                alert('Microphone access denied.');
+            }
+        }
+
+        function stopRealtimeMicrophone() {
+            isRecording = false;
+
+            if (audioProcessor) {
+                audioProcessor.disconnect();
+                audioProcessor = null;
+            }
+
+            if (mediaStream) {
+                mediaStream.getTracks().forEach(track => track.stop());
+                mediaStream = null;
+            }
+
+            if (audioContext) {
+                audioContext.close();
+                audioContext = null;
+            }
+
+            realtimeMicButton.classList.remove('recording');
+            realtimeMicButton.textContent = '🎙️ Start Recording';
+            realtimeMicStatus.textContent = '';
+
+            log('INFO', `Microphone stopped (${recordedChunks.length} chunks recorded)`);
+            log('INFO', 'Waiting for OpenAI to process and respond...');
+        }
+
+        // ===== PIPELINE MODE FUNCTIONS =====
+
+        async function togglePipelineMicrophone() {
+            if (!isRecording) {
+                await startPipelineMicrophone();
+            } else {
+                stopPipelineMicrophone();
+            }
+        }
+
+        async function startPipelineMicrophone() {
+            try {
+                log('INFO', 'Requesting microphone access...');
+
+                const audioConstraints = {
+                    echoCancellation: true,
+                    noiseSuppression: true,
+                    autoGainControl: true  // Enable auto gain to boost quiet microphones
+                };
+
+                // Use selected input device if not system default
+                const selectedInputDevice = pipelineAudioInputSelect.value;
+                if (selectedInputDevice) {
+                    audioConstraints.deviceId = selectedInputDevice;
+                    log('INFO', `Using selected input device: ${pipelineAudioInputSelect.options[pipelineAudioInputSelect.selectedIndex].text}`);
+                }
+
+                mediaStream = await navigator.mediaDevices.getUserMedia({
+                    audio: audioConstraints
+                });
+
+                audioContext = new (window.AudioContext || window.webkitAudioContext)({
+                    sampleRate: 24000
+                });
+
+                const source = audioContext.createMediaStreamSource(mediaStream);
+                audioProcessor = audioContext.createScriptProcessor(4096, 1, 1);
+
+                source.connect(audioProcessor);
+                audioProcessor.connect(audioContext.destination);
+
+                isRecording = true;
+                recordedChunks = [];
+                pipelineMicButton.classList.add('recording');
+                pipelineMicButton.textContent = '⏹️ Stop Recording';
+                pipelineMicStatus.textContent = 'Recording... 🔴';
+
+                log('SUCCESS', 'Microphone started (24kHz)');
+
+                audioProcessor.onaudioprocess = (event) => {
+                    if (!isRecording) return;
+
+                    const audioData = event.inputBuffer.getChannelData(0);
+                    const int16Array = new Int16Array(audioData.length);
+
+                    for (let i = 0; i < audioData.length; i++) {
+                        int16Array[i] = Math.max(-1, Math.min(1, audioData[i])) * 0x7FFF;
+                    }
+
+                    recordedChunks.push(int16Array);
+                };
+            } catch (error) {
+                log('ERROR', `Microphone error: ${error.message}`);
+                alert('Microphone access denied.');
+            }
+        }
+
+        function stopPipelineMicrophone() {
+            isRecording = false;
+
+            if (audioProcessor) {
+                audioProcessor.disconnect();
+                audioProcessor = null;
+            }
+
+            if (mediaStream) {
+                mediaStream.getTracks().forEach(track => track.stop());
+                mediaStream = null;
+            }
+
+            if (audioContext) {
+                audioContext.close();
+                audioContext = null;
+            }
+
+            pipelineMicButton.classList.remove('recording');
+            pipelineMicButton.textContent = '🎙️ Start Recording';
+            pipelineMicStatus.textContent = '';
+
+            log('INFO', `Microphone stopped (${recordedChunks.length} chunks recorded)`);
+            processPipelineAudio();
+        }
+
+        // Function to create a proper WAV file from PCM16 samples
+        function createWavFile(samples, sampleRate = 24000) {
+            const numChannels = 1; // mono
+            const bitsPerSample = 16;
+            const byteRate = sampleRate * numChannels * bitsPerSample / 8;
+            const blockAlign = numChannels * bitsPerSample / 8;
+            const dataSize = samples.length * 2;
+
+            // Create buffer for WAV file
+            const buffer = new ArrayBuffer(44 + dataSize);
+            const view = new DataView(buffer);
+            let offset = 0;
+
+            // Write WAV header
+            const writeString = (str) => {
+                for (let i = 0; i < str.length; i++) {
+                    view.setUint8(offset++, str.charCodeAt(i));
+                }
+            };
+
+            // "RIFF" chunk descriptor
+            writeString('RIFF');
+            view.setUint32(offset, 36 + dataSize, true); // file size - 8
+            offset += 4;
+            writeString('WAVE');
+
+            // "fmt " subchunk
+            writeString('fmt ');
+            view.setUint32(offset, 16, true); // subchunk size (16 for PCM)
+            offset += 4;
+            view.setUint16(offset, 1, true); // audio format (1 for PCM)
+            offset += 2;
+            view.setUint16(offset, numChannels, true); // number of channels
+            offset += 2;
+            view.setUint32(offset, sampleRate, true); // sample rate
+            offset += 4;
+            view.setUint32(offset, byteRate, true); // byte rate
+            offset += 4;
+            view.setUint16(offset, blockAlign, true); // block align
+            offset += 2;
+            view.setUint16(offset, bitsPerSample, true); // bits per sample
+            offset += 2;
+
+            // "data" subchunk
+            writeString('data');
+            view.setUint32(offset, dataSize, true); // subchunk size
+            offset += 4;
+
+            // Write PCM samples
+            for (let i = 0; i < samples.length; i++) {
+                view.setInt16(offset, samples[i], true);
+                offset += 2;
+            }
+
+            return new Blob([buffer], { type: 'audio/wav' });
+        }
+
+        async function processPipelineAudio() {
+            if (recordedChunks.length === 0) {
+                log('ERROR', 'No audio recorded');
+                return;
+            }
+
+            updateStatus('processing', 'Processing...');
+            pipelineMicButton.disabled = true;
+
+            try {
+                // Combine chunks into single Int16Array
+                const totalLength = recordedChunks.reduce((acc, arr) => acc + arr.length, 0);
+                const combinedSamples = new Int16Array(totalLength);
+
+                let offset = 0;
+                for (let chunk of recordedChunks) {
+                    combinedSamples.set(chunk, offset);
+                    offset += chunk.length;
+                }
+
+                // Create proper WAV file
+                const audioBlob = createWavFile(combinedSamples, 24000);
+                const formData = new FormData();
+                formData.append('file', audioBlob, 'recording.wav');
+
+                // Build query parameters
+                const params = new URLSearchParams();
+
+                const systemPrompt = pipelineSystemPromptEl.value.trim();
+                if (systemPrompt) {
+                    params.append('system_prompt', systemPrompt);
+                }
+
+                const language = pipelineLanguageEl.value;
+                if (language) {
+                    params.append('language', language);
+                }
+
+                params.append('llm_model', pipelineLLMModelEl.value);
+                params.append('temperature', pipelineTemperatureEl.value);
+                params.append('tts_voice', pipelineVoiceEl.value);
+                params.append('tts_model', pipelineTTSModelEl.value);
+                params.append('output_format', pipelineOutputFormatEl.value);
+
+                const url = `http://localhost:8000/api/audio/voice-to-voice?${params.toString()}`;
+
+                log('INFO', `Sending audio to pipeline (${(audioBlob.size / 1024).toFixed(2)} KB)`);
+                log('INFO', `Configuration: ${pipelineLLMModelEl.value} (T=${pipelineTemperatureEl.value}), ${pipelineVoiceEl.value}, ${pipelineOutputFormatEl.value}`);
+
+                const response = await fetch(url, {
+                    method: 'POST',
+                    body: formData
+                });
+
+                if (!response.ok) {
+                    const errorData = await response.json();
+                    throw new Error(errorData.detail || `HTTP ${response.status}`);
+                }
+
+                // Get transcribed and response text from headers
+                let transcribedText = response.headers.get('X-Transcribed-Text');
+                let responseText = response.headers.get('X-Response-Text');
+
+                // Decode URL-encoded headers
+                try {
+                    transcribedText = transcribedText ? decodeURIComponent(transcribedText) : 'N/A';
+                } catch (e) {
+                    log('WARNING', `Failed to decode transcribed text: ${e.message}`);
+                    transcribedText = transcribedText || 'N/A';
+                }
+
+                try {
+                    responseText = responseText ? decodeURIComponent(responseText) : 'N/A';
+                } catch (e) {
+                    log('WARNING', `Failed to decode response text: ${e.message}`);
+                    responseText = responseText || 'N/A';
+                }
+
+                log('TRANSCRIPT', `User: ${transcribedText}`);
+                log('TRANSCRIPT', `Assistant: ${responseText}`);
+
+                // Display results
+                pipelineTranscribedTextEl.textContent = transcribedText;
+                pipelineResponseTextEl.textContent = responseText;
+
+                // Get audio blob
+                const audioResponseBlob = await response.blob();
+                log('INFO', `Received audio: ${(audioResponseBlob.size / 1024).toFixed(2)} KB`);
+
+                // Create audio URL and display player
+                const audioUrl = URL.createObjectURL(audioResponseBlob);
+                pipelineAudioPlayer.src = audioUrl;
+                pipelineAudioPlayer.style.display = 'block';
+                pipelineAudioStatusEl.textContent = `✓ Audio ready (${(audioResponseBlob.size / 1024).toFixed(2)} KB)`;
+
+                // Show response section
+                pipelineResponseSection.style.display = 'block';
+
+                updateStatus('success', 'Success!');
+
+            } catch (error) {
+                log('ERROR', error.message);
+                updateStatus('error', `Error: ${error.message}`);
+            } finally {
+                pipelineMicButton.disabled = false;
+                recordedChunks = [];
+            }
+        }
+
+        // ===== SMART VOICE MODE (VAD) FUNCTIONS =====
+
+        function playSmartTestSound() {
+            playTestSound(smartAudioOutputSelect.value, smartTestSoundBtn);
+        }
+
+        async function startSmartVoice() {
+            try {
+                log('INFO', 'Starting Smart Voice (VAD) mode...');
+                updateStatus('processing', 'Initializing...');
+                smartStartBtn.disabled = true;
+
+                const voice = smartVoiceSelect.value;
+                const instructions = smartInstructions.value;
+
+                const wsUrl = `ws://localhost:8000/api/ws/smart-voice?voice=${encodeURIComponent(voice)}&instructions=${encodeURIComponent(instructions)}`;
+
+                log('INFO', `Connecting to Smart Voice endpoint: ws://localhost:8000/api/ws/smart-voice`);
+
+                smartWs = new WebSocket(wsUrl);
+
+                smartWs.onopen = () => {
+                    log('SUCCESS', 'Connected to Smart Voice WebSocket');
+                    updateStatus('connected', 'Listening...');
+                    smartStartBtn.disabled = true;
+                    smartStopBtn.disabled = false;
+                    smartVadPanel.style.display = 'block';
+                    smartTranscriptContainer.style.display = 'block';
+                    smartIsListening = true;
+
+                    // Start microphone
+                    startSmartMicrophone();
+                };
+
+                smartWs.onmessage = (event) => {
+                    try {
+                        const message = JSON.parse(event.data);
+
+                        if (message.type === 'status') {
+                            log('INFO', message.message);
+                            smartStatus.textContent = message.message;
+                        } else if (message.type === 'vad_status') {
+                            updateVadDisplay(message);
+                        } else if (message.type === 'transcript') {
+                            addTranscript(message.user_text, 'user');
+                            addTranscript(message.assistant_text, 'assistant');
+                            log('TRANSCRIPT', `User: ${message.user_text}`);
+                            log('TRANSCRIPT', `Assistant: ${message.assistant_text}`);
+                        } else if (message.type === 'audio') {
+                            // Decode and play audio
+                            const audioBytes = base64ToArrayBuffer(message.audio);
+                            const audioBlob = new Blob([audioBytes], { type: 'audio/mpeg' });
+                            const audioUrl = URL.createObjectURL(audioBlob);
+                            smartAudioPlayer.src = audioUrl;
+                            smartResponseSection.style.display = 'block';
+                            smartAudioPlayer.play();
+                            log('INFO', 'Playing response audio');
+                        } else if (message.type === 'error') {
+                            log('ERROR', message.message);
+                            updateStatus('error', `Error: ${message.message}`);
+                        }
+                    } catch (e) {
+                        log('ERROR', `Failed to parse message: ${e.message}`);
+                    }
+                };
+
+                smartWs.onerror = (error) => {
+                    log('ERROR', `WebSocket error: ${error}`);
+                    updateStatus('error', 'WebSocket error');
+                };
+
+                smartWs.onclose = () => {
+                    log('INFO', 'Smart Voice WebSocket disconnected');
+                    updateStatus('idle', 'Disconnected');
+                    smartStartBtn.disabled = false;
+                    smartStopBtn.disabled = true;
+                    smartVadPanel.style.display = 'none';
+                    smartIsListening = false;
+
+                    if (smartMediaStream) {
+                        stopSmartMicrophone();
+                    }
+                };
+
+            } catch (error) {
+                log('ERROR', `Error starting Smart Voice: ${error.message}`);
+                updateStatus('error', `Error: ${error.message}`);
+                smartStartBtn.disabled = false;
+            }
+        }
+
+        function stopSmartVoice() {
+            log('INFO', 'Stopping Smart Voice mode...');
+            stopSmartMicrophone();
+            smartIsListening = false;
+
+            if (smartWs) {
+                smartWs.close();
+                smartWs = null;
+            }
+
+            smartStartBtn.disabled = false;
+            smartStopBtn.disabled = true;
+            smartVadPanel.style.display = 'none';
+            updateStatus('idle', 'Stopped');
+        }
+
+        async function startSmartMicrophone() {
+            try {
+                log('INFO', 'Requesting microphone access...');
+
+                const audioConstraints = {
+                    sampleRate: { ideal: 16000 },  // Request 16kHz for VAD
+                    echoCancellation: true,
+                    noiseSuppression: true,
+                    autoGainControl: true  // Enable auto gain to boost quiet microphones
+                };
+
+                // Use selected input device if not system default
+                const selectedInputDevice = smartAudioInputSelect.value;
+                if (selectedInputDevice) {
+                    audioConstraints.deviceId = selectedInputDevice;
+                    log('INFO', `Using selected input device: ${smartAudioInputSelect.options[smartAudioInputSelect.selectedIndex].text}`);
+                }
+
+                smartMediaStream = await navigator.mediaDevices.getUserMedia({
+                    audio: audioConstraints
+                });
+
+                // Get actual sample rate from the stream
+                const audioTracks = smartMediaStream.getAudioTracks();
+                const actualSampleRate = audioTracks[0].getSettings().sampleRate;
+                log('INFO', `Audio stream sample rate: ${actualSampleRate} Hz`);
+
+                smartAudioContext = new (window.AudioContext || window.webkitAudioContext)();
+                const contextSampleRate = smartAudioContext.sampleRate;
+                log('INFO', `AudioContext sample rate: ${contextSampleRate} Hz`);
+
+                // Calculate chunk size for 30ms at the actual sample rate
+                // Must be power of 2: 256, 512, 1024, 2048, 4096, 8192, 16384
+                const samplesFor30ms = Math.round(contextSampleRate * 0.03);
+                let bufferSize = 256;
+                while (bufferSize < samplesFor30ms) {
+                    bufferSize *= 2;
+                }
+                log('INFO', `Using buffer size: ${bufferSize} samples (≈${Math.round(bufferSize/contextSampleRate*1000)}ms at ${contextSampleRate}Hz)`);
+
+                const source = smartAudioContext.createMediaStreamSource(smartMediaStream);
+                smartAudioProcessor = smartAudioContext.createScriptProcessor(bufferSize, 1, 1);
+
+                source.connect(smartAudioProcessor);
+                smartAudioProcessor.connect(smartAudioContext.destination);
+
+                log('SUCCESS', 'Microphone started (16kHz for VAD)');
+
+                let audioChunkCount = 0;
+                let peakLevel = 0;
+                let audioBuffer = new Float32Array(0);  // Accumulate audio until we have 512 samples at 16kHz
+                const SAMPLES_PER_CHUNK = 512;  // Silero VAD requires exactly 512 samples at 16kHz
+
+                smartAudioProcessor.onaudioprocess = (event) => {
+                    if (!smartIsListening) return;
+
+                    const audioData = event.inputBuffer.getChannelData(0);
+
+                    // Calculate audio level for debugging
+                    let maxLevel = 0;
+                    for (let i = 0; i < audioData.length; i++) {
+                        const level = Math.abs(audioData[i]);
+                        if (level > maxLevel) maxLevel = level;
+                    }
+                    peakLevel = Math.max(peakLevel * 0.95, maxLevel);  // Smooth decay
+
+                    // Resample to 16kHz if needed
+                    let audioToAdd;
+                    if (contextSampleRate !== 16000) {
+                        // Simple linear resampling to 16kHz
+                        const ratio = 16000 / contextSampleRate;
+                        const newLength = Math.round(audioData.length * ratio);
+                        const resampled = new Float32Array(newLength);
+
+                        for (let i = 0; i < newLength; i++) {
+                            const sourceIndex = i / ratio;
+                            const leftIndex = Math.floor(sourceIndex);
+                            const rightIndex = Math.ceil(sourceIndex);
+                            const fraction = sourceIndex - leftIndex;
+
+                            if (rightIndex >= audioData.length) {
+                                resampled[i] = audioData[leftIndex] || 0;
+                            } else {
+                                resampled[i] = audioData[leftIndex] * (1 - fraction) + audioData[rightIndex] * fraction;
+                            }
+                        }
+                        audioToAdd = resampled;
+                    } else {
+                        audioToAdd = audioData;
+                    }
+
+                    // Accumulate audio in buffer
+                    const newBuffer = new Float32Array(audioBuffer.length + audioToAdd.length);
+                    newBuffer.set(audioBuffer);
+                    newBuffer.set(audioToAdd, audioBuffer.length);
+                    audioBuffer = newBuffer;
+
+                    // Send 512-sample chunks to VAD
+                    while (audioBuffer.length >= SAMPLES_PER_CHUNK) {
+                        // Extract 512 samples
+                        const chunk = audioBuffer.slice(0, SAMPLES_PER_CHUNK);
+                        audioBuffer = audioBuffer.slice(SAMPLES_PER_CHUNK);
+
+                        // Convert float32 to int16
+                        const int16Array = new Int16Array(chunk.length);
+                        for (let i = 0; i < chunk.length; i++) {
+                            int16Array[i] = Math.max(-1, Math.min(1, chunk[i])) * 0x7FFF;
+                        }
+
+                        // Send to server
+                        if (smartWs && smartWs.readyState === WebSocket.OPEN) {
+                            // Convert int16Array to base64 properly
+                            const uint8Array = new Uint8Array(int16Array.buffer);
+                            let binaryString = '';
+                            for (let i = 0; i < uint8Array.length; i++) {
+                                binaryString += String.fromCharCode(uint8Array[i]);
+                            }
+                            const audioBase64 = btoa(binaryString);
+
+                            const message = {
+                                type: 'audio_chunk',
+                                audio: audioBase64
+                            };
+                            try {
+                                smartWs.send(JSON.stringify(message));
+                                audioChunkCount++;
+                                if (audioChunkCount === 1) {
+                                    log('INFO', 'First audio chunk (512 samples @ 16kHz) sent to server');
+                                }
+                                if (audioChunkCount % 20 === 0) {  // Log every 20 chunks (~640ms)
+                                    const levelPercent = Math.round(peakLevel * 100);
+                                    log('DEBUG', `Sent ${audioChunkCount} chunks (512 samples each), Peak level: ${levelPercent}%`);
+                                }
+                            } catch (e) {
+                                log('ERROR', `Failed to send audio chunk: ${e.message}`);
+                            }
+                        } else {
+                            if (audioChunkCount === 0) {
+                                log('WARNING', 'WebSocket not open yet, buffering audio');
+                            }
+                        }
+                    }
+                };
+
+            } catch (error) {
+                log('ERROR', `Microphone error: ${error.message}`);
+                alert('Microphone access denied.');
+                stopSmartVoice();
+            }
+        }
+
+        function stopSmartMicrophone() {
+            if (smartAudioProcessor) {
+                smartAudioProcessor.disconnect();
+                smartAudioProcessor = null;
+            }
+
+            if (smartMediaStream) {
+                smartMediaStream.getTracks().forEach(track => track.stop());
+                smartMediaStream = null;
+            }
+
+            if (smartAudioContext) {
+                smartAudioContext.close();
+                smartAudioContext = null;
+            }
+
+            log('INFO', 'Microphone stopped');
+        }
+
+        function updateVadDisplay(vadStatus) {
+            // Update indicator
+            const indicator = smartVadIndicator;
+            indicator.className = 'vad-indicator';
+
+            if (vadStatus.speech_detected) {
+                indicator.classList.add('speaking');
+                smartVadLabel.textContent = '🔴 Speaking...';
+            } else if (vadStatus.is_speaking) {
+                indicator.classList.add('listening');
+                smartVadLabel.textContent = '🟡 Processing...';
+            } else {
+                indicator.classList.add('listening');
+                smartVadLabel.textContent = '🔵 Listening...';
+            }
+
+            // Update stats
+            smartSpeechDetected.textContent = vadStatus.speech_detected ? 'Yes' : 'No';
+            smartSpeechBar.style.width = `${Math.min(vadStatus.speech_prob * 100, 100)}%`;
+            smartSpeechDuration.textContent = `${vadStatus.speech_duration_ms} ms`;
+            smartSilenceDuration.textContent = `${vadStatus.silence_duration_ms} ms`;
+        }
+
+        function addTranscript(text, role) {
+            const line = document.createElement('div');
+            line.className = `transcript-line transcript-${role}-line`;
+            line.textContent = `${role === 'user' ? '👤' : '🤖'} ${text}`;
+            smartTranscriptContent.appendChild(line);
+            smartTranscriptContainer.scrollTop = smartTranscriptContainer.scrollHeight;
+        }
+
+        function base64ToArrayBuffer(base64) {
+            const binaryString = atob(base64);
+            const bytes = new Uint8Array(binaryString.length);
+            for (let i = 0; i < binaryString.length; i++) {
+                bytes[i] = binaryString.charCodeAt(i);
+            }
+            return bytes.buffer;
+        }
+    </script>
+</body>
+</html>
